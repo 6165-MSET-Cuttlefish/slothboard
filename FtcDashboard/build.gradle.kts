@@ -3,10 +3,10 @@ import com.android.build.gradle.internal.tasks.factory.dependsOn
 plugins {
 	id("com.github.node-gradle.node") version "2.2.4"
 	id("dev.frozenmilk.android-library") version "10.3.0-0.1.4"
-	id("dev.frozenmilk.publish") version "0.0.5"
 	id("dev.frozenmilk.doc") version "0.0.5"
 	id("dev.frozenmilk.build-meta-data") version "0.0.1"
 	id("org.gradle.checkstyle")
+	`maven-publish`
 }
 
 android.namespace = "com.acmerobotics.dashboard"
@@ -16,7 +16,7 @@ checkstyle {
 }
 
 node {
-	version = "18.12.1"
+	version = "16.20.2"
 	download = true
 	nodeModulesDir = file("${project.projectDir}/../client")
 }
@@ -65,12 +65,11 @@ repositories {
 	}
 }
 
-dairyPublishing {
-	gitDir = file("..")
-}
+group = findProperty("slothboard.group") as String? ?: "com.acmerobotics.slothboard"
+version = findProperty("slothboard.version") as String? ?: "1.0.0"
 
 dependencies {
-	api("com.acmerobotics.slothboard:core:${dairyPublishing.version}") {
+	api("com.acmerobotics.slothboard:core:${version}") {
 		isTransitive = false
 	}
 
@@ -85,10 +84,20 @@ meta {
 	packagePath = "com.acmerobotics.dashboard"
 	name = "Dashboard"
 	registerField("name", "String", "\"com.acmerobotics.slothboard.Dashboard\"")
-	registerField("clean", "Boolean") { "${dairyPublishing.clean}" }
-	registerField("gitRef", "String") { "\"${dairyPublishing.gitRef}\"" }
-	registerField("snapshot", "Boolean") { "${dairyPublishing.snapshot}" }
-	registerField("version", "String") { "\"${dairyPublishing.version}\"" }
+	
+	// Use dynamic values based on git state
+	val gitBranch = providers.exec {
+		commandLine("git", "rev-parse", "--abbrev-ref", "HEAD")
+	}.standardOutput.asText.get().trim()
+	
+	val gitClean = providers.exec {
+		commandLine("git", "status", "--porcelain")
+	}.standardOutput.asText.get().isEmpty()
+	
+	registerField("clean", "Boolean", "$gitClean")
+	registerField("gitRef", "String", "\"$gitBranch\"")
+	registerField("snapshot", "Boolean", "${version.toString().contains("SNAPSHOT", ignoreCase = true)}")
+	registerField("version", "String", "\"$version\"")
 }
 
 publishing {
@@ -107,7 +116,7 @@ publishing {
 			pom {
 				description = "Web dashboard designed for FTC"
 				name = "FTC Dashboard"
-				url = "https://github.com/acmerobotics/ftc-dashboard"
+				url = "https://github.com/6165-MSET-CuttleFish/slothboard"
 
 				licenses {
 					license {
@@ -126,7 +135,7 @@ publishing {
 				}
 
 				scm {
-					url = "https://github.com/acmerobotics/ftc-dashboard"
+					url = "https://github.com/6165-MSET-CuttleFish/slothboard"
 				}
 			}
 		}

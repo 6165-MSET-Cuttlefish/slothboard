@@ -297,16 +297,29 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications {
     }
 
     public void sendOpModes() {
-        FtcDashboard.getInstance().opModeList.with(l -> {
-            l.clear();
-            for (OpModeMeta opModeMeta : SinisterRegisteredOpModes.INSTANCE.getOpModes()) {
-                if (opModeMeta.flavor != OpModeMeta.Flavor.SYSTEM) {
-                    l.add(opModeMeta.name);
-                }
+        List<OpModeInfo> infoList = new ArrayList<>();
+        
+        for (OpModeMeta opModeMeta : SinisterRegisteredOpModes.INSTANCE.getOpModes()) {
+            if (opModeMeta.flavor != OpModeMeta.Flavor.SYSTEM) {
+                infoList.add(new OpModeInfo(opModeMeta.name, opModeMeta.group));
             }
-            Collections.sort(l);
-            getInstance().sendAll(new ReceiveOpModeList(l));
+        }
+        
+        // Sort op mode info list by group, then by name
+        infoList.sort((a, b) -> {
+            int groupComparison = a.getGroup().compareToIgnoreCase(b.getGroup());
+            if (groupComparison != 0) {
+                return groupComparison;
+            }
+            return a.getName().compareToIgnoreCase(b.getName());
         });
+        
+        opModeInfoList.with(infoListShared -> {
+            infoListShared.clear();
+            infoListShared.addAll(infoList);
+        });
+        
+        getInstance().sendAll(new ReceiveOpModeList(infoList));
     }
 
     private class GamepadWatchdogRunnable implements Runnable {

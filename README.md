@@ -25,8 +25,8 @@ Check out our [online documentation](https://acmerobotics.github.io/ftc-dashboar
 ## Basic
 
 1. Open [`build.dependencies.gradle`](https://github.com/FIRST-Tech-Challenge/FtcRobotController/blob/master/build.dependencies.gradle)
-2. In the `repositories` section, add `maven { url = 'https://repo.dairy.foundation/releases' }`
-3. In the `dependencies` section, add `implementation 'com.acmerobotics.slothboard:dashboard:0.2.4+0.4.17'`
+2. In the `repositories` section, add `maven { url = 'https://jitpack.io' }`
+3. In the `dependencies` section, add `implementation 'com.github.6165-MSET-CuttleFish:slothboard:-SNAPSHOT'`
 
 # Development
 
@@ -35,8 +35,8 @@ Check out our [online documentation](https://acmerobotics.github.io/ftc-dashboar
 1. Install Node.js
 
    - Note: Node.js 16+ is required for builds to work on M1 MacBooks
-   - Current Node version used in gradle builds can be found in [FtcDashboard/build.gradle](https://github.com/Dairy-Foundation/ftc-dashboard/blob/master/FtcDashboard/build.gradle#L33)
-   - Node version is `18.12.1` as of time of writing
+   - Current Node version used in gradle builds can be found in [FtcDashboard/build.gradle.kts](https://github.com/6165-MSET-CuttleFish/slothboard/blob/master/FtcDashboard/build.gradle.kts)
+   - Node version is `16.20.2` as of time of writing
 
 2. Install Yarn
 

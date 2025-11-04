@@ -1,8 +1,8 @@
 plugins {
 	id("dev.frozenmilk.jvm-library") version "10.2.0-0.1.3"
-	id("dev.frozenmilk.publish") version "0.0.4"
 	id("dev.frozenmilk.doc") version "0.0.4"
 	id("org.gradle.checkstyle")
+	`maven-publish`
 }
 
 checkstyle {
@@ -22,9 +22,8 @@ dependencies {
 	testImplementation("org.nanohttpd:nanohttpd-websocket:2.3.1")
 }
 
-dairyPublishing {
-	gitDir = file("..")
-}
+group = findProperty("slothboard.group") as String? ?: "com.acmerobotics.slothboard"
+version = findProperty("slothboard.version") as String? ?: "1.0.0"
 
 publishing {
 	publications {
@@ -42,7 +41,7 @@ publishing {
 			pom {
 				description = "Web dashboard designed for FTC"
 				name = "FTC Dashboard"
-				url = "https://github.com/acmerobotics/ftc-dashboard"
+				url = "https://github.com/6165-MSET-CuttleFish/slothboard"
 
 				licenses {
 					license {
@@ -61,7 +60,7 @@ publishing {
 				}
 
 				scm {
-					url = "https://github.com/acmerobotics/ftc-dashboard"
+					url = "https://github.com/6165-MSET-CuttleFish/slothboard"
 				}
 			}
 		}

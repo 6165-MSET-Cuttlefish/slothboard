@@ -230,13 +230,21 @@ public class HardwareOpMode extends OpMode {
     private void applyMotorConfiguration(DcMotorEx motor, CustomVariable config) {
         ConfigVariable<?> runModeVar = config.getVariable("Run Mode");
         if (runModeVar != null) {
-            motor.setMode((DcMotorEx.RunMode) runModeVar.getValue());
+            Object value = runModeVar.getValue();
+            if (value instanceof DcMotorEx.RunMode) {
+                motor.setMode((DcMotorEx.RunMode) value);
+            }
         }
 
         ConfigVariable<?> targetPosVar = config.getVariable("Target Position");
         if (targetPosVar != null) {
             try {
-                motor.setTargetPosition((int) targetPosVar.getValue());
+                Object value = targetPosVar.getValue();
+                if (value instanceof Integer) {
+                    motor.setTargetPosition((Integer) value);
+                } else if (value instanceof Number) {
+                    motor.setTargetPosition(((Number) value).intValue());
+                }
             } catch (Exception e) {
                 System.out.println("Error setting target position: " + e);
             }
@@ -341,7 +349,16 @@ public class HardwareOpMode extends OpMode {
         ConfigVariable<?> positionVar = config.getVariable("Position");
         if (positionVar == null) return;
 
-        double newPosition = (double) positionVar.getValue();
+        Object value = positionVar.getValue();
+        double newPosition;
+        if (value instanceof Double) {
+            newPosition = (Double) value;
+        } else if (value instanceof Number) {
+            newPosition = ((Number) value).doubleValue();
+        } else {
+            return;
+        }
+        
         if (newPosition != -1.0) {
             servo.setPosition(newPosition);
         }
