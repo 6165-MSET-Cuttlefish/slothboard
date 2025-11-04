@@ -1,5 +1,6 @@
 package com.acmerobotics.dashboard.config.reflection;
 
+import com.acmerobotics.dashboard.config.VariableProvider;
 import com.acmerobotics.dashboard.config.variable.BasicVariable;
 import com.acmerobotics.dashboard.config.variable.ConfigVariable;
 import com.acmerobotics.dashboard.config.variable.CustomVariable;
@@ -65,7 +66,8 @@ public class ReflectionConfig {
                         }
                     } else {
                         for (Field nestedField : fieldClass.getFields()) {
-                            if (Modifier.isFinal(field.getModifiers())) {
+                            if (Modifier.isFinal(field.getModifiers())
+                                || Modifier.isStatic(field.getModifiers())) {
                                 continue;
                             }
 
@@ -111,7 +113,8 @@ public class ReflectionConfig {
                         }
                     } else {
                         for (Field nestedField : fieldClass.getFields()) {
-                            if (Modifier.isFinal(field.getModifiers())) {
+                            if (Modifier.isFinal(field.getModifiers())
+                                || Modifier.isStatic(nestedField.getModifiers())) {
                                 continue;
                             }
 

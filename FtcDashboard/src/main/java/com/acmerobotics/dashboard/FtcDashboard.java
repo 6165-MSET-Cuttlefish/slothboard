@@ -20,6 +20,7 @@ import com.acmerobotics.dashboard.config.Config;
 import com.acmerobotics.dashboard.config.ValueProvider;
 import com.acmerobotics.dashboard.config.reflection.ReflectionConfig;
 import com.acmerobotics.dashboard.config.variable.CustomVariable;
+import com.acmerobotics.dashboard.OpModeInfo;
 import com.acmerobotics.dashboard.message.Message;
 import com.acmerobotics.dashboard.message.redux.InitOpMode;
 import com.acmerobotics.dashboard.message.redux.ReceiveGamepadState;
@@ -115,6 +116,8 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications {
 
     private static final String PREFS_NAME = "FtcDashboard";
     private static final String PREFS_AUTO_ENABLE_KEY = "autoEnable";
+
+    private static final String HARDWARE_CATEGORY = "__hardware__";
 
     private static FtcDashboard instance = new FtcDashboard();
 
@@ -275,7 +278,7 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications {
 
     private final Mutex<OpModeAndStatus> activeOpMode = new Mutex<>(new OpModeAndStatus());
 
-    private final Mutex<List<String>> opModeList = new Mutex<>(new ArrayList<>());
+    private final Mutex<List<OpModeInfo>> opModeInfoList = new Mutex<>(new ArrayList<>());
 
     private ExecutorService gamepadWatchdogExecutor;
     private long lastGamepadTimestamp;
@@ -334,16 +337,30 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications {
     private class ListOpModesRunnable implements Runnable {
         @Override
         public void run() {
-            opModeList.with(l -> {
-                l.clear();
-                for (OpModeMeta opModeMeta : SinisterRegisteredOpModes.INSTANCE.getOpModes()) {
-                    if (opModeMeta.flavor != OpModeMeta.Flavor.SYSTEM) {
-                        l.add(opModeMeta.name);
-                    }
+            List<OpModeInfo> infoList = new ArrayList<>();
+            
+            for (OpModeMeta opModeMeta : SinisterRegisteredOpModes.INSTANCE.getOpModes()) {
+                if (opModeMeta.flavor != OpModeMeta.Flavor.SYSTEM) {
+                    infoList.add(new OpModeInfo(opModeMeta.name, opModeMeta.group));
                 }
-                Collections.sort(l);
-                sendAll(new ReceiveOpModeList(l));
+            }
+            
+            // Sort op mode info list by group, then by name
+            infoList.sort((a, b) -> {
+                int groupComparison = a.getGroup().compareToIgnoreCase(b.getGroup());
+                if (groupComparison != 0) {
+                    return groupComparison;
+                }
+                return a.getName().compareToIgnoreCase(b.getName());
             });
+            
+            // Update the shared opModeInfoList
+            opModeInfoList.with(infoListShared -> {
+                infoListShared.clear();
+                infoListShared.addAll(infoList);
+            });
+            
+            sendAll(new ReceiveOpModeList(infoList));
         }
     }
 
@@ -783,9 +800,9 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications {
         protected void onOpen() {
             sh.onOpen();
 
-            opModeList.with(l -> {
-                if (l.size() > 0) {
-                    send(new ReceiveOpModeList(l));
+            opModeInfoList.with(infoList -> {
+                if (!infoList.isEmpty()) {
+                    send(new ReceiveOpModeList(new ArrayList<>(infoList)));
                 }
             });
 
@@ -1187,6 +1204,37 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications {
         });
     }
 
+    private void internalRegisterOpMode(OpModeManager manager) {
+        manager.register(
+            new OpModeMeta.Builder()
+                .setName("Enable/Disable Dashboard")
+                .setFlavor(OpModeMeta.Flavor.TELEOP)
+                .setGroup("Dashboard")
+                .build(),
+            new LinearOpMode() {
+                @Override
+                public void runOpMode() throws InterruptedException {
+                    telemetry.log().add(
+                        Misc.formatInvariant("Dashboard is currently %s. Press Start to %s it.",
+                            core.enabled ? "enabled" : "disabled",
+                            core.enabled ? "disable" : "enable"));
+                    telemetry.update();
+
+                    waitForStart();
+
+                    if (isStopRequested()) {
+                        return;
+                    }
+
+                    if (core.enabled) {
+                        disable();
+                    } else {
+                        enable();
+                    }
+                }
+            });
+    }
+
     /**
      * Queues a telemetry packet to be sent to all clients. Packets are sent in batches of
      * approximate period {@link #getTelemetryTransmissionInterval()}. Clients display the most
@@ -1248,6 +1296,30 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications {
      */
     public void withConfigRoot(CustomVariableConsumer function) {
         core.withConfigRoot(function);
+    }
+
+    /**
+     * Runs {@code function} with the hardware subtree of the configuration root.
+     *
+     * <p>If the top-level hardware category ("{@value #HARDWARE_CATEGORY}") does not
+     * yet exist it will be created. The provided {@link CustomVariableConsumer} is
+     * invoked while holding the same exclusive config-root lock used by
+     * {@link #withConfigRoot(CustomVariableConsumer)}, so callers may safely modify the
+     * hardware config tree inside the consumer. Do not leak references to the
+     * config tree outside the consumer.</p>
+     *
+     * @param function consumer that receives the {@link CustomVariable} representing the
+     *                 hardware category and may modify it as needed
+     */
+    public void withHardwareRoot(CustomVariableConsumer function) {
+        withConfigRoot(root -> {
+            CustomVariable hardwareVar = (CustomVariable) root.getVariable(HARDWARE_CATEGORY);
+            if (hardwareVar == null) {
+                hardwareVar = new CustomVariable();
+                root.putVariable(HARDWARE_CATEGORY, hardwareVar);
+            }
+            function.accept(hardwareVar);
+        });
     }
 
     /**
