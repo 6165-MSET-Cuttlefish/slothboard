@@ -7,8 +7,6 @@ pluginManagement {
 	}
 }
 
-includeBuild("../FtcDashboard") {
-	dependencySubstitution {
-		substitute(module("com.acmerobotics.slothboard:dashboard")).using(project(":"))
-	}
+plugins {
+	id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
 }

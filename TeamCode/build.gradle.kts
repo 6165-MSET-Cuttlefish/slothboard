@@ -3,6 +3,10 @@ plugins {
 	id("dev.frozenmilk.sinister.sloth.load") version "0.2.2"
 }
 
+repositories {
+	mavenLocal()
+}
+
 ftc {
 	// use this to easily add more FTC libraries
 
@@ -10,6 +14,8 @@ ftc {
 	kotlin
 }
 
+val slothboardVersion = findProperty("slothboard.version") as String? ?: "1.0.0"
+
 dependencies {
-	implementation("com.acmerobotics.slothboard:dashboard")
+	implementation("com.acmerobotics.slothboard:dashboard:$slothboardVersion")
 }

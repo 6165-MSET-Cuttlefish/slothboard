@@ -15,7 +15,7 @@ repositories {
 
 dependencies {
 	//noinspection GradleDependency
-	implementation("com.google.code.gson:gson:2.8.6")
+	compileOnly("com.google.code.gson:gson:2.8.6")
 
 	testImplementation("org.junit.jupiter:junit-jupiter:5.9.1")
 
