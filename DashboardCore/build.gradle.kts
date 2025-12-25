@@ -17,6 +17,8 @@ dependencies {
 	//noinspection GradleDependency
 	compileOnly("com.google.code.gson:gson:2.8.6")
 
+	testImplementation("com.google.code.gson:gson:2.8.6")
+
 	testImplementation("org.junit.jupiter:junit-jupiter:5.9.1")
 
 	testImplementation("org.nanohttpd:nanohttpd-websocket:2.3.1")
