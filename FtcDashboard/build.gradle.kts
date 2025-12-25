@@ -44,6 +44,12 @@ android.libraryVariants.all {
 	preBuildProvider.get().dependsOn(copyDashAssets)
 }
 
+android {
+	defaultConfig {
+		consumerProguardFiles("proguard-rules.pro")
+	}
+}
+
 ftc {
 	kotlin
 	sdk {
