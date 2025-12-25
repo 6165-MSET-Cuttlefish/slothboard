@@ -26,7 +26,7 @@ Check out our [online documentation](https://acmerobotics.github.io/ftc-dashboar
 
 1. Open [`build.dependencies.gradle`](https://github.com/FIRST-Tech-Challenge/FtcRobotController/blob/master/build.dependencies.gradle)
 2. In the `repositories` section, add `maven { url = 'https://jitpack.io' }`
-3. In the `dependencies` section, add `implementation 'com.github.6165-MSET-CuttleFish:slothboard:-SNAPSHOT'`
+3. In the `dependencies` section, add `implementation 'com.github.6165-MSET-Cuttlefish.slothboard:dashboard:-SNAPSHOT'`
 
 # Development
 
