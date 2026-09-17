@@ -2,7 +2,7 @@ import com.android.build.gradle.internal.tasks.factory.dependsOn
 
 plugins {
     id("com.github.node-gradle.node") version "7.1.0"
-    id("dev.frozenmilk.android-library") version "11.2.1-1.2.0"
+    id("dev.frozenmilk.android-library") version "12.0.0-1.2.2"
     id("dev.frozenmilk.publish") version "0.1.0"
     id("dev.frozenmilk.doc") version "0.1.0"
     id("dev.frozenmilk.build-meta-data") version "0.1.0"
@@ -62,7 +62,7 @@ ftc {
         compileOnly(appcompat)
     }
     dairy {
-        implementation(Sloth("0.3.1"))
+        implementation(Sloth)
     }
 }
 

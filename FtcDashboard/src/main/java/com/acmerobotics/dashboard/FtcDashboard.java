@@ -17,7 +17,6 @@ import android.widget.TextView;
 import com.acmerobotics.dashboard.config.ValueProvider;
 import com.acmerobotics.dashboard.config.variable.CustomVariable;
 import com.acmerobotics.dashboard.limelight.LimelightProxyManager;
-import com.acmerobotics.dashboard.OpModeInfo;
 import com.acmerobotics.dashboard.message.Message;
 import com.acmerobotics.dashboard.message.redux.DeleteHardwareConfig;
 import com.acmerobotics.dashboard.message.redux.InitOpMode;
@@ -370,7 +369,7 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications {
             if (targetConfig.delete()) {
                 RobotLog.e(TAG, "Successfully deleted hardware config: " + name);
             } else {
-                RobotLog.ee(TAG, "Failed to delete hardware config: " + name, null);
+                RobotLog.ee(TAG, "Failed to delete hardware config: " + name);
             }
         } else {
             RobotLog.w(TAG, "Hardware config file does not exist: " + name);
