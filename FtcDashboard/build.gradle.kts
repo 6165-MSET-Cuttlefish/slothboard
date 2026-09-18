@@ -11,6 +11,9 @@ plugins {
 
 android.namespace = "com.acmerobotics.dashboard"
 
+// The telemetry logic resolves no android.* class, so it runs as a plain JVM test.
+android.testOptions.unitTests.all { it.useJUnitPlatform() }
+
 checkstyle {
     toolVersion = "8.18"
 }
@@ -74,6 +77,12 @@ dependencies {
     implementation("org.nanohttpd:nanohttpd-websocket:2.3.1") {
         exclude(module = "nanohttpd")
     }
+
+    // The SDK is compileOnly for the library; the unit tests compile against Telemetry too.
+    testImplementation("org.firstinspires.ftc:RobotCore:12.0.0")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.9.1")
+    // Gradle 9 no longer puts the launcher on the test runtime classpath itself.
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.9.1")
 }
 
 meta {

@@ -14,8 +14,15 @@ dependencies {
 	implementation("com.google.code.gson:gson:2.8.6")
 
 	testImplementation("org.junit.jupiter:junit-jupiter:5.9.1")
+	// Gradle 9 no longer puts the launcher on the test runtime classpath itself.
+	testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.9.1")
 
 	testImplementation("org.nanohttpd:nanohttpd-websocket:2.3.1")
+}
+
+// The suite is JUnit 5; the conversion from Groovy dropped the platform and discovered nothing.
+tasks.test {
+	useJUnitPlatform()
 }
 
 dairyPublishing {
