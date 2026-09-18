@@ -20,6 +20,8 @@ import com.acmerobotics.dashboard.message.redux.StartLogcatCapture;
 import com.acmerobotics.dashboard.message.redux.StartOpMode;
 import com.acmerobotics.dashboard.message.redux.StopLogcatCapture;
 import com.acmerobotics.dashboard.message.redux.StopOpMode;
+import com.acmerobotics.dashboard.message.redux.WriteHardwareConfig;
+import com.acmerobotics.dashboard.message.redux.DeleteHardwareConfig;
 
 /**
  * Dashboard message types. These values match the corresponding Redux actions in the frontend.
