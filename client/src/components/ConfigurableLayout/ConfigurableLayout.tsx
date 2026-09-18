@@ -839,7 +839,7 @@ export default function ConfigurableLayout() {
         bottom="13em"
         right="1.5em"
         onClick={addItem}
-        disabledViews={new Set([...singletonViews].filter((v) => existingViews.has(v)))}
+        disabledViews={new Set([...SINGLETON_VIEWS].filter((v) => existingViews.has(v)))}
       />
       <ShareLayoutModal
         isOpen={isShareModalOpen}

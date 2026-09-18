@@ -1,8 +1,6 @@
-import { CSSProperties, Fragment, useId } from 'react';
-import { Dialog, Disclosure, Transition } from '@headlessui/react';
 import { CSSProperties, Fragment, useId, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Dialog, Transition } from '@headlessui/react';
+import { Dialog, Disclosure, Transition } from '@headlessui/react';
 import clsx from 'clsx';
 
 import { ReactComponent as PaletteIcon } from '@/assets/icons/palette.svg';

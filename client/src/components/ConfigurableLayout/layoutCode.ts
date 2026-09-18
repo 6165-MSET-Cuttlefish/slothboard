@@ -22,6 +22,7 @@ const VIEW_KEYS: { [key in ConfigurableView]: string } = {
   [ConfigurableView.GAMEPAD_VIEW]: 'gamepad',
   [ConfigurableView.ERROR_VIEW]: 'error',
   [ConfigurableView.LIMELIGHT_VIEW]: 'limelight',
+  [ConfigurableView.LOG_VIEW]: 'log',
 };
 
 const VIEWS_BY_KEY = new Map(
