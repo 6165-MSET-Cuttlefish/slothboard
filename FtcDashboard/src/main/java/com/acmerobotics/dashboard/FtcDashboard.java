@@ -24,6 +24,7 @@ import com.acmerobotics.dashboard.message.redux.ReceiveGamepadState;
 import com.acmerobotics.dashboard.message.redux.ReceiveHardwareConfigList;
 import com.acmerobotics.dashboard.message.redux.ReceiveImage;
 import com.acmerobotics.dashboard.message.redux.ReceiveLogcatErrors;
+import com.acmerobotics.dashboard.message.redux.ReceiveLogcatLines;
 import com.acmerobotics.dashboard.message.redux.ReceiveOpModeList;
 import com.acmerobotics.dashboard.message.redux.ReceiveRobotStatus;
 import com.acmerobotics.dashboard.message.redux.SetHardwareConfig;
@@ -72,8 +73,18 @@ import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
@@ -259,7 +270,12 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications {
 
     private ExecutorService gamepadWatchdogExecutor;
     private ExecutorService logcatMonitorExecutor;
-    private LogcatMonitorRunnable logcatMonitorRunnable;
+    private volatile LogcatMonitorRunnable logcatMonitorRunnable;
+
+    private final Mutex<Set<SendFun>> logcatCaptureSockets = new Mutex<>(new LinkedHashSet<>());
+    private ExecutorService logcatCaptureExecutor;
+    private volatile LogcatMonitorRunnable logcatCaptureRunnable;
+
     private long lastGamepadTimestamp;
 
     private boolean webServerAttached;
@@ -418,57 +434,80 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications {
 
     private class LogcatMonitorRunnable implements Runnable {
         private static final String OPMODE_MANAGER_TAG = "OpModeManager";
+
+        private final boolean opModeManagerOnly;
+
+        // logcat's threadtime stamps carry no year, so they are read against the year the monitor
+        // started, in the device's own time zone.
+        private final SimpleDateFormat timestampFormat =
+                new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US);
+        private final String timestampYear =
+                String.valueOf(Calendar.getInstance().get(Calendar.YEAR));
+
         private volatile boolean running = true;
+        private volatile Process logcatProcess;
+
+        LogcatMonitorRunnable(boolean opModeManagerOnly) {
+            this.opModeManagerOnly = opModeManagerOnly;
+        }
 
         @Override
         public void run() {
-            Process logcatProcess = null;
             BufferedReader reader = null;
-            
+            boolean processStarted = false;
+
             try {
-                // Start logcat process filtering for OpModeManager tag
-                ProcessBuilder pb = new ProcessBuilder("logcat", "-s", OPMODE_MANAGER_TAG + ":*");
-                logcatProcess = pb.start();
-                reader = new BufferedReader(new InputStreamReader(logcatProcess.getInputStream()));
-                
+                // parseLogcatLine() reads the column layout of the "threadtime" format, so the
+                // format has to be pinned instead of left at whatever logcat defaults to.
+                ProcessBuilder pb =
+                        opModeManagerOnly
+                                ? new ProcessBuilder(
+                                        "logcat",
+                                        "-v",
+                                        "threadtime",
+                                        "-s",
+                                        OPMODE_MANAGER_TAG + ":*")
+                                : new ProcessBuilder("logcat", "-v", "threadtime", "-T", "1");
+                pb.redirectErrorStream(true);
+                Process process = pb.start();
+                logcatProcess = process;
+                processStarted = true;
+                reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+                sendMonitorNotice("INFO", "logcat monitor started");
+
                 String line;
-                List<ReceiveLogcatErrors.LogcatError> errorBuffer = new ArrayList<>();
-                
+                List<ReceiveLogcatErrors.LogcatError> entryBuffer = new ArrayList<>();
+
                 while (running && (line = reader.readLine()) != null) {
                     try {
-                        // Parse logcat line format: timestamp PID TID level tag: message
-                        // Example: "01-15 10:30:45.123  1234  1234 E OpModeManager: Error message"
-                        ReceiveLogcatErrors.LogcatError error = parseLogcatLine(line);
-                        if (error != null) {
-                            errorBuffer.add(error);
-                            
-                            // Send errors in batches to avoid flooding
-                            if (errorBuffer.size() >= 10) {
-                                sendAll(new ReceiveLogcatErrors(new ArrayList<>(errorBuffer)));
-                                errorBuffer.clear();
-                            }
+                        ReceiveLogcatErrors.LogcatError entry = parseLogcatLine(line);
+                        if (entry != null) {
+                            entryBuffer.add(entry);
                         }
                     } catch (Exception e) {
-                        // Log parsing error but continue monitoring
                         RobotLog.ww(TAG, "Failed to parse logcat line: " + line);
                     }
-                    
-                    // Small delay to prevent excessive CPU usage
-                    try {
-                        Thread.sleep(50);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        break;
+
+                    // Flushing on drain keeps a trickle of lines out of the buffer.
+                    if (!entryBuffer.isEmpty() && (entryBuffer.size() >= 50 || !reader.ready())) {
+                        sendEntries(new ArrayList<>(entryBuffer));
+                        entryBuffer.clear();
                     }
                 }
-                
-                // Send any remaining errors
-                if (!errorBuffer.isEmpty()) {
-                    sendAll(new ReceiveLogcatErrors(errorBuffer));
+
+                if (!entryBuffer.isEmpty()) {
+                    sendEntries(entryBuffer);
                 }
-                
+
             } catch (IOException e) {
-                RobotLog.ww(TAG, "Failed to start logcat monitoring: " + e.getMessage());
+                if (processStarted) {
+                    // stop() closes the stream out from under readLine().
+                    RobotLog.ww(TAG, "logcat monitoring ended: " + e.getMessage());
+                } else {
+                    RobotLog.ww(TAG, "Failed to start logcat monitoring: " + e.getMessage());
+                    sendMonitorNotice("ERROR", "logcat monitor failed to start: " + e.getMessage());
+                }
             } finally {
                 if (reader != null) {
                     try {
@@ -477,30 +516,54 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications {
                         // Ignore
                     }
                 }
-                if (logcatProcess != null) {
-                    logcatProcess.destroy();
+                Process process = logcatProcess;
+                if (process != null) {
+                    process.destroy();
+                }
+                if (processStarted && isCurrentLogcatMonitor(this)) {
+                    sendMonitorNotice("INFO", "logcat monitor stopped");
+                }
+                if (!opModeManagerOnly) {
+                    releaseLogcatCapture(this);
                 }
             }
         }
-        
+
+        private void sendEntries(List<ReceiveLogcatErrors.LogcatError> entries) {
+            if (opModeManagerOnly) {
+                sendAll(new ReceiveLogcatErrors(entries));
+            } else {
+                sendLogcatCapture(new ReceiveLogcatLines(entries));
+            }
+        }
+
+        // Bypasses logcat so a capturing client can tell a dead monitor apart from a live one that
+        // is simply seeing no output. Levels use the client's full-word form (see mapLevel).
+        private void sendMonitorNotice(String level, String message) {
+            if (opModeManagerOnly) {
+                return;
+            }
+
+            sendEntries(
+                    Collections.singletonList(
+                            new ReceiveLogcatErrors.LogcatError(
+                                    System.currentTimeMillis(), level, TAG, message)));
+        }
+
         private ReceiveLogcatErrors.LogcatError parseLogcatLine(String line) {
             try {
-                // Skip empty or invalid lines
                 if (line == null || line.trim().isEmpty()) {
                     return null;
                 }
-                
-                // Look for log level indicators (E, W, I, D, V)
+
+                // threadtime layout: date time PID TID level tag: message
                 String[] parts = line.split("\\s+", 6);
                 if (parts.length < 6) {
                     return null;
                 }
-                
-                // Extract components: timestamp, level, tag, message
-                String level = parts[4]; // Log level (E, W, I, etc.)
+
                 String tagAndMessage = parts[5];
-                
-                // Split tag and message at the colon
+
                 int colonIndex = tagAndMessage.indexOf(':');
                 if (colonIndex == -1) {
                     return null;
@@ -508,25 +571,65 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications {
                 
                 String tag = tagAndMessage.substring(0, colonIndex).trim();
                 String message = tagAndMessage.substring(colonIndex + 1).trim();
-                
-                // Only process OpModeManager messages
-                if (!OPMODE_MANAGER_TAG.equals(tag)) {
+
+                if (tag.isEmpty()) {
                     return null;
                 }
-                
+
+                if (opModeManagerOnly && !OPMODE_MANAGER_TAG.equals(tag)) {
+                    return null;
+                }
+
                 return new ReceiveLogcatErrors.LogcatError(
-                    System.currentTimeMillis(),
-                    level,
-                    tag,
-                    message
-                );
+                        parseLogcatTimestamp(parts[0], parts[1]), mapLevel(parts[4]), tag, message);
             } catch (Exception e) {
                 return null;
             }
         }
-        
+
+        private long parseLogcatTimestamp(String date, String time) {
+            try {
+                Date parsed = timestampFormat.parse(timestampYear + "-" + date + " " + time);
+                if (parsed != null) {
+                    return parsed.getTime();
+                }
+            } catch (ParseException e) {
+                // Fall back to the time the line was read.
+            }
+
+            return System.currentTimeMillis();
+        }
+
+        // threadtime reports levels as single letters; the client keys its colors and labels off
+        // the full names.
+        private String mapLevel(String level) {
+            switch (level) {
+                case "E":
+                    return "ERROR";
+                case "W":
+                    return "WARN";
+                case "I":
+                    return "INFO";
+                case "D":
+                    return "DEBUG";
+                case "V":
+                    return "VERBOSE";
+                case "F":
+                    return "ERROR";
+                default:
+                    return level;
+            }
+        }
+
         public void stop() {
             running = false;
+
+            // readLine() on the process pipe does not answer an interrupt, so the process has to
+            // go for the loop to wake up.
+            Process process = logcatProcess;
+            if (process != null) {
+                process.destroy();
+            }
         }
     }
 
@@ -965,6 +1068,10 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications {
                 String messageStr = DashboardCore.GSON.toJson(message);
                 send(messageStr);
             } catch (IOException e) {
+                // A peer that vanished without closing would otherwise keep the capture monitor
+                // alive for as long as this socket is listed.
+                stopLogcatCapture(this);
+
                 // NOTE: It's possible that the socket has closed and we have a backlog of messages
                 // to send. Settle for logging here instead of trying to get all the checks right.
                 RobotLog.logStackTrace(e);
@@ -1010,6 +1117,8 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications {
                                boolean initiatedByRemote) {
             sh.onClose();
 
+            stopLogcatCapture(this);
+
             updateStatusView();
         }
 
@@ -1023,30 +1132,47 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications {
             }
 
             switch (msg.getType()) {
-                case GET_ROBOT_STATUS: {
-                    send(new ReceiveRobotStatus(getRobotStatus()));
-                    break;
-                }
-                case INIT_OP_MODE: {
-                    String opModeName = ((InitOpMode) msg).getOpModeName();
-                    opModeManager.initOpMode(opModeName);
-                    break;
-                }
-                case START_OP_MODE: {
-                    opModeManager.startActiveOpMode();
-                    break;
-                }
-                case STOP_OP_MODE: {
-                    eventLoop.requestOpModeStop(opModeManager.getActiveOpMode());
-                    break;
-                }
-                case RECEIVE_GAMEPAD_STATE: {
-                    ReceiveGamepadState castMsg = (ReceiveGamepadState) msg;
-                    updateGamepads(castMsg.getGamepad1(), castMsg.getGamepad2());
-                    break;
-                }
-                case SET_HARDWARE_CONFIG: {
-                    String hardwareConfigName = ((SetHardwareConfig) msg).getHardwareConfigName();
+                case GET_ROBOT_STATUS:
+                    {
+                        send(new ReceiveRobotStatus(getRobotStatus()));
+                        break;
+                    }
+                case INIT_OP_MODE:
+                    {
+                        String opModeName = ((InitOpMode) msg).getOpModeName();
+                        opModeManager.initOpMode(opModeName);
+                        break;
+                    }
+                case START_OP_MODE:
+                    {
+                        opModeManager.startActiveOpMode();
+                        break;
+                    }
+                case STOP_OP_MODE:
+                    {
+                        eventLoop.requestOpModeStop(opModeManager.getActiveOpMode());
+                        break;
+                    }
+                case START_LOGCAT_CAPTURE:
+                    {
+                        startLogcatCapture(this);
+                        break;
+                    }
+                case STOP_LOGCAT_CAPTURE:
+                    {
+                        stopLogcatCapture(this);
+                        break;
+                    }
+                case RECEIVE_GAMEPAD_STATE:
+                    {
+                        ReceiveGamepadState castMsg = (ReceiveGamepadState) msg;
+                        updateGamepads(castMsg.getGamepad1(), castMsg.getGamepad2());
+                        break;
+                    }
+                case SET_HARDWARE_CONFIG:
+                    {
+                        String hardwareConfigName =
+                                ((SetHardwareConfig) msg).getHardwareConfigName();
 
                     activeOpMode.with(o -> {
                         // Don't allow changing the config unless stopped. Who knows what undefined behavior that would cause
@@ -1173,7 +1299,7 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications {
         gamepadWatchdogExecutor.submit(new GamepadWatchdogRunnable());
 
         logcatMonitorExecutor = ThreadPool.newSingleThreadExecutor("logcat monitor");
-        logcatMonitorRunnable = new LogcatMonitorRunnable();
+        logcatMonitorRunnable = new LogcatMonitorRunnable(true);
         logcatMonitorExecutor.submit(logcatMonitorRunnable);
 
         limelightProxyManager.start();
@@ -1198,6 +1324,8 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications {
         if (logcatMonitorExecutor != null) {
             logcatMonitorExecutor.shutdownNow();
         }
+
+        stopAllLogcatCapture();
 
         stopCameraStream();
 
@@ -1733,6 +1861,86 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications {
                         batteryVoltage
                 );
             });
+        }
+    }
+
+    // A monitor thread can outlive the enable() that created it, and only the live one speaks
+    // for the dashboard.
+    private boolean isCurrentLogcatMonitor(LogcatMonitorRunnable runnable) {
+        return runnable == logcatMonitorRunnable || runnable == logcatCaptureRunnable;
+    }
+
+    private void startLogcatCapture(SendFun sendFun) {
+        logcatCaptureSockets.with(
+                sockets -> {
+                    if (!sockets.add(sendFun) || logcatCaptureRunnable != null) {
+                        return;
+                    }
+
+                    logcatCaptureExecutor = ThreadPool.newSingleThreadExecutor("logcat capture");
+                    logcatCaptureRunnable = new LogcatMonitorRunnable(false);
+                    logcatCaptureExecutor.submit(logcatCaptureRunnable);
+                });
+    }
+
+    private void stopLogcatCapture(SendFun sendFun) {
+        logcatCaptureSockets.with(
+                sockets -> {
+                    if (!sockets.remove(sendFun) || !sockets.isEmpty()) {
+                        return;
+                    }
+
+                    tearDownLogcatCapture();
+                });
+    }
+
+    private void stopAllLogcatCapture() {
+        logcatCaptureSockets.with(
+                sockets -> {
+                    sockets.clear();
+
+                    tearDownLogcatCapture();
+                });
+    }
+
+    // A capture monitor that ends on its own has to release the field, or startLogcatCapture()
+    // refuses to spawn a replacement while sockets are still capturing.
+    private void releaseLogcatCapture(LogcatMonitorRunnable runnable) {
+        logcatCaptureSockets.with(
+                sockets -> {
+                    if (logcatCaptureRunnable != runnable) {
+                        return;
+                    }
+
+                    logcatCaptureRunnable = null;
+                    if (logcatCaptureExecutor != null) {
+                        logcatCaptureExecutor.shutdown();
+                        logcatCaptureExecutor = null;
+                    }
+                });
+    }
+
+    // Callers hold the logcatCaptureSockets lock.
+    private void tearDownLogcatCapture() {
+        if (logcatCaptureRunnable != null) {
+            logcatCaptureRunnable.stop();
+            logcatCaptureRunnable = null;
+        }
+        if (logcatCaptureExecutor != null) {
+            logcatCaptureExecutor.shutdownNow();
+            logcatCaptureExecutor = null;
+        }
+    }
+
+    private void sendLogcatCapture(Message message) {
+        List<SendFun> targets =
+                logcatCaptureSockets.with(
+                        sockets -> {
+                            return new ArrayList<SendFun>(sockets);
+                        });
+
+        for (SendFun sendFun : targets) {
+            sendFun.send(message);
         }
     }
 

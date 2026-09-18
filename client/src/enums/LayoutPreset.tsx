@@ -12,6 +12,7 @@ import HardwareConfigView from '@/components/views/HardwareConfigView/HardwareCo
 import TelemetryView from '@/components/views/TelemetryView';
 import FieldView from '@/components/views/FieldView/FieldView';
 import HardwareView from '@/components/views/HardwareView';
+import LogView from '@/components/views/LogView/LogView';
 
 // When adding a preset here (and to LAYOUT_DETAILS below), also add it to
 // PRESET_ORDER in @/hooks/useLayoutShortcuts.ts so it gets a keyboard
@@ -21,6 +22,7 @@ const LayoutPreset = {
   FIELD: 'FIELD',
   GRAPH: 'GRAPH',
   HARDWARE: 'HARDWARE',
+  LOG: 'LOG',
   ORIGINAL: 'ORIGINAL',
   CONFIGURABLE: 'CONFIGURABLE',
 } as const;
@@ -100,6 +102,28 @@ const LAYOUT_DETAILS: { [key in Values<typeof LayoutPreset>]: Layout } = {
         </Tile>
         <Tile row={2} col={2}>
           <HardwareView />
+        </Tile>
+      </TileGrid>
+    ),
+  },
+  [LayoutPreset.LOG]: {
+    name: 'Logcat',
+    content: (
+      <TileGrid gridTemplate="220px calc(60% - 220px) 40% / 30% 40% 30%">
+        <Tile row="1 / span 1" col={1}>
+          <OpModeView />
+        </Tile>
+        <Tile row="2 / span 2" col={1}>
+          <LogView />
+        </Tile>
+        <Tile row="1 / span 3" col={2}>
+          <GraphView />
+        </Tile>
+        <Tile row="1 / span 2" col={3}>
+          <ConfigView />
+        </Tile>
+        <Tile row={3} col={3}>
+          <TelemetryView />
         </Tile>
       </TileGrid>
     ),
