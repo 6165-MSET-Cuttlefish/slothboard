@@ -316,14 +316,14 @@ const LoggingView = ({
       setIsRecording(false);
     } else if (activeOpMode === STOP_OP_MODE_TAG) {
       setIsRecording(false);
+    } else if (activeOpModeStatus === OpModeStatus.STOPPED) {
+      setIsRecording(false);
     } else if (
       (activeOpModeStatus === OpModeStatus.RUNNING || telemetry.length > 1) &&
       !capturing
     ) {
       setIsRecording(true);
       clearPastTelemetry();
-    } else if (activeOpModeStatus === OpModeStatus.STOPPED) {
-      setIsRecording(false);
     }
   }, [
     activeOpMode,
@@ -429,8 +429,8 @@ const LoggingView = ({
       ? recording.opMode || recording.name
       : currentOpModeName;
     const year = fileDate.getFullYear();
-    const month = `0${fileDate.getMonth()}`.slice(-2);
-    const date = `0${fileDate.getDay()}`.slice(-2);
+    const month = `0${fileDate.getMonth() + 1}`.slice(-2);
+    const date = `0${fileDate.getDate()}`.slice(-2);
 
     const hourlyDate = DateToHHMMSS(fileDate)
       .replaceAll(':', '_')
