@@ -268,18 +268,25 @@ const TelemetryView = ({
     <BaseView isUnlocked={isUnlocked}>
       <div className="flex-center">
         <BaseViewHeading
-          className="min-w-0 flex-1 basis-24 truncate"
+          className="flex min-w-0 flex-1 basis-24 items-center"
           isDraggable={isDraggable}
         >
-          Telemetry
-          {/* An override is easy to set and forget, so say so rather than leaving someone to
-              wonder why their telemetry renders differently here than anywhere else. */}
-          {formatOverride !== null && (
-            <span className="ml-2 align-middle text-sm font-normal text-gray-500 dark:text-gray-400">
-              {formatOverride.toLowerCase()}
+          <span className="min-w-0 shrink-[1000] truncate">
+            Telemetry
+            {/* An override is easy to set and forget, so say so rather than leaving someone to
+                wonder why their telemetry renders differently here than anywhere else. */}
+            {formatOverride !== null && (
+              <span className="ml-2 align-middle text-sm font-normal text-gray-500 dark:text-gray-400">
+                {formatOverride.toLowerCase()}
+              </span>
+            )}
+          </span>
+          {/* Gives way only once the title has truncated, so it never widens the row. */}
+          {isReplay && (
+            <span className="flex min-w-0 overflow-hidden">
+              <ReplayBadge source="replacing" />
             </span>
           )}
-          {isReplay && <ReplayBadge source="replacing" />}
         </BaseViewHeading>
         {isHeld && (
           <span
