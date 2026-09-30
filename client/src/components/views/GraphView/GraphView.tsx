@@ -416,13 +416,16 @@ class GraphView extends Component<GraphViewProps, GraphViewState> {
     const shownKeys = this.shownKeys();
     const seriesColors = this.seriesColors();
 
-    // markers sent from robot code share their packet's timestamp
-    const markers = this.props.telemetry.flatMap((packet) =>
-      (packet.markers ?? []).map((label) => ({
-        t: packet.timestamp,
-        label,
-      })),
-    );
+    // markers sent from robot code share their packet's timestamp; a seek's
+    // seed repeats the last packet's, so it is skipped like in buildRows
+    const markers = this.props.telemetry
+      .filter((packet) => !packet.seed)
+      .flatMap((packet) =>
+        (packet.markers ?? []).map((label) => ({
+          t: packet.timestamp,
+          label,
+        })),
+      );
 
     return (
       <BaseView
