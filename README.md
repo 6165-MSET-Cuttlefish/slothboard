@@ -65,7 +65,7 @@ Check out our [online documentation](https://acmerobotics.github.io/ftc-dashboar
 
 ## Mock server
 
-To test without an FTC app, run the mock server located at `DashboardCore/src/test/java/com/acmerobotics/dashboard/TestServer.java`, or run `./gradlew :DashboardCore:runTestServer`.
+To test without an FTC app, run the mock server located at `DashboardCore/src/test/java/com/acmerobotics/dashboard/TestServer.java`, or run `./gradlew runTestServer` from `DashboardCore/`.
 
 - Mock server is a simple Java server hosting mock FTC op modes
 - A test sample op mode can be found at [`TestSineWaveOpMode.java`](https://github.com/acmerobotics/ftc-dashboard/blob/master/DashboardCore/src/test/java/com/acmerobotics/dashboard/TestSineWaveOpMode.java)
