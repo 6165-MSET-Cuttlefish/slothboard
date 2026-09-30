@@ -575,7 +575,8 @@ export default class Graph {
     let nearestDist = Number.MAX_VALUE;
 
     for (const name of Object.keys(this.data)) {
-      const { ts, vs, color } = this.data[name];
+      const { ts, vs } = this.data[name];
+      const color = this.colorFor(name);
 
       if (ts.length === 0) continue;
 
