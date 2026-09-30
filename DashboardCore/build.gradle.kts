@@ -22,6 +22,11 @@ dairyPublishing {
 	gitDir = file("..")
 }
 
+tasks.register<JavaExec>("runTestServer") {
+	classpath = sourceSets["test"].runtimeClasspath
+	mainClass.set("com.acmerobotics.dashboard.TestServer")
+}
+
 publishing {
 	publications {
 		register<MavenPublication>("release") {
