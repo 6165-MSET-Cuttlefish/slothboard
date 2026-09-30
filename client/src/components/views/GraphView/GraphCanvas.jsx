@@ -95,6 +95,7 @@ class GraphCanvas extends React.Component {
     ) {
       // The recording paused too, so what is plotted moves up to meet it.
       this.graph.shift(Date.now() - (this.frozenAt ?? Date.now()));
+      this.reportBounds();
     }
 
     // Before the add below: a seek re-sends history older than what is plotted.
