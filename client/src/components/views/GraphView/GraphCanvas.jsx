@@ -243,6 +243,9 @@ class GraphCanvas extends React.Component {
       this.draftRef.current !== null &&
       this.draftRef.current.contains(evt.target);
 
+    // The view focuses itself on mousedown, which would blur and close the draft.
+    if (this.pressedInDraft) evt.stopPropagation();
+
     if (!this.graph || this.pressedInDraft) return;
 
     const { x, y } = this.canvasCoords(evt);
