@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSelector } from 'react-redux';
 import clsx from 'clsx';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -11,6 +12,8 @@ import BaseView, {
   BaseViewProps,
 } from '@/components/views/BaseView';
 import usePersistentState from '@/hooks/usePersistentState';
+import ReplayBadge from '@/components/views/ReplayBadge';
+import { RootState } from '@/store/reducers';
 
 import { ReactComponent as PauseIcon } from '@/assets/icons/pause.svg';
 import { ReactComponent as PlayIcon } from '@/assets/icons/play_arrow.svg';
@@ -69,6 +72,9 @@ const LoopTimeView = ({
 
   const [showSettings, setShowSettings] = useState(false);
   const [paused, setPaused] = useState(false);
+  const isReplay = useSelector(
+    (state: RootState) => state.playback.mode === 'playback',
+  );
 
   const { samples, availableKeys, reset } = useLoopSamples(
     DEFAULT_MAX_SAMPLES,
@@ -111,7 +117,10 @@ const LoopTimeView = ({
   return (
     <BaseView isUnlocked={isUnlocked}>
       <div className="flex">
-        <BaseViewHeading isDraggable={isDraggable}>Loop Time</BaseViewHeading>
+        <BaseViewHeading isDraggable={isDraggable}>
+          Loop Time
+          {isReplay && <ReplayBadge source="replacing" />}
+        </BaseViewHeading>
         <BaseViewIcons>
           <BaseViewIconButton
             title={paused ? 'Resume sampling' : 'Pause sampling'}

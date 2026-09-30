@@ -35,6 +35,7 @@ export default function useLoopSamples(
   reset: () => void;
 } {
   const packets = useSelector((state: RootState) => state.telemetry);
+  const foldToken = useSelector((state: RootState) => state.playback.foldToken);
 
   const [samples, setSamples] = useState<LoopSample[]>([]);
   const [availableKeys, setAvailableKeys] = useState<string[]>([]);
@@ -43,6 +44,8 @@ export default function useLoopSamples(
   const clearedWhilePaused = useRef(false);
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
+  const seenFoldToken = useRef(foldToken);
+  const seenPackets = useRef<typeof packets | null>(null);
 
   const reset = useCallback(() => {
     lastTimestamp.current = 0;
@@ -51,6 +54,19 @@ export default function useLoopSamples(
   }, []);
 
   useEffect(() => {
+    // A replay load, seek or exit starts the history over before its batch
+    // lands, even while paused: the frozen samples came from another source.
+    if (seenFoldToken.current !== foldToken) {
+      seenFoldToken.current = foldToken;
+      clearedWhilePaused.current = false;
+      lastTimestamp.current = 0;
+      setSamples([]);
+    }
+
+    // A token change alone must not re-add the batch already taken.
+    if (seenPackets.current === packets) return;
+    seenPackets.current = packets;
+
     if (packets.length === 0) {
       if (pausedRef.current) {
         clearedWhilePaused.current = true;
@@ -60,7 +76,7 @@ export default function useLoopSamples(
       return;
     }
 
-    const batch = packets.map((packet) => ({
+    const discovered = packets.map((packet) => ({
       timestamp: packet.timestamp,
       values: numericValues(packet.data),
     }));
@@ -70,7 +86,7 @@ export default function useLoopSamples(
       const seen = new Set(prev);
       let changed = false;
 
-      for (const sample of batch) {
+      for (const sample of discovered) {
         for (const key of Object.keys(sample.values)) {
           if (seen.has(key)) continue;
           seen.add(key);
@@ -89,6 +105,13 @@ export default function useLoopSamples(
       setSamples([]);
     }
 
+    // A seek's prefill starts over at its last clear, as playing through would,
+    // and its seed is the state it landed on, not a loop the robot ran.
+    const last = packets[packets.length - 1];
+    const from = last.seed === true ? last.afterClear ?? 0 : 0;
+    const batch = discovered.filter((_, i) => i >= from && !packets[i].seed);
+    if (batch.length === 0) return;
+
     // Packets carry the robot's wall clock, which a time sync can move back.
     const newest = batch[batch.length - 1].timestamp;
     if (newest < lastTimestamp.current) lastTimestamp.current = 0;
@@ -101,7 +124,7 @@ export default function useLoopSamples(
     lastTimestamp.current = fresh[fresh.length - 1].timestamp;
 
     setSamples((prev) => [...prev, ...fresh].slice(-maxSamples));
-  }, [packets, maxSamples, reset]);
+  }, [packets, foldToken, maxSamples, reset]);
 
   return { samples, availableKeys, reset };
 }

@@ -501,12 +501,16 @@ function seekTo(store: Store, tMs: number) {
   );
 
   // One batch: per frame, a 20 Hz scrub would re-run every fold ~1600 times a
-  // second. Clears inside the window only matter to what the seed carries.
+  // second. Clears inside the window only matter to what the seed carries,
+  // which marks where the last one fell for views that start over at a clear.
   const packets: TelemetryItem[] = [];
+  let afterClear = 0;
   for (const segment of segments) {
     if (segment.kind === 'batch') packets.push(...segment.packets);
+    else afterClear = packets.length;
   }
   const seed = seedPacket(rec, base, virtualTs(target, speed), target);
+  seed.afterClear = afterClear;
   // Compare mode leaves the Telemetry view live, so only playback needs this.
   if (mode === 'playback') {
     seed.telemetryTick = telemetryTickAt(rec, targetIdx, (t) =>

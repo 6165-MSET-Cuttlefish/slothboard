@@ -166,12 +166,12 @@ const VIEW_OPTIONS = [
   {
     mode: 'playback' as const,
     label: 'Play it back',
-    hint: 'Field, Graph, Telemetry and Logging all show the recording. Live data is paused until you close it.',
+    hint: 'Field, Graph, Telemetry, Logging and Loop Time all show the recording. Live data is paused until you close it.',
   },
   {
     mode: 'ghost' as const,
     label: 'Compare with live',
-    hint: 'Lines this recording up with the live run and draws it over the Field and Graph, so you can see where the two diverge. Telemetry and Logging stay live.',
+    hint: 'Lines this recording up with the live run and draws it over the Field and Graph, so you can see where the two diverge. Telemetry, Logging and Loop Time stay live.',
   },
 ];
 

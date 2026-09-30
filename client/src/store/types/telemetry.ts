@@ -171,6 +171,9 @@ export type TelemetryItem = {
   /** Replay only, on a seed: the packets the Telemetry view shows at the seek
    *  target, which may predate the prefill; empty when it shows nothing. */
   telemetryTick?: TelemetryItem[];
+  /** Replay only, on a seed: index in its batch of the first packet after the
+   *  last clear the seek folded over. */
+  afterClear?: number;
 };
 
 export type ReceiveTelemetryAction = {
