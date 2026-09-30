@@ -14,7 +14,7 @@ import sanitizeTelemetryHtml, {
   truncateTelemetry,
 } from '@/components/views/TelemetryView/sanitizeTelemetryHtml';
 import { RootState } from '@/store/reducers';
-import { TelemetryDisplayFormat } from '@/store/types/telemetry';
+import { Telemetry, TelemetryDisplayFormat } from '@/store/types/telemetry';
 import buildFrame, {
   DisplayedLine,
   Frame,
@@ -30,6 +30,8 @@ type FormatOverride = TelemetryDisplayFormat | null;
 
 const MENU_GAP = 8;
 
+const HOLD_TIMEOUT = 10000;
+
 const FORMAT_OPTIONS: { label: string; value: FormatOverride }[] = [
   { label: 'Auto', value: null },
   { label: 'Classic', value: 'CLASSIC' },
@@ -37,20 +39,100 @@ const FORMAT_OPTIONS: { label: string; value: FormatOverride }[] = [
   { label: 'HTML', value: 'HTML' },
 ];
 
+const EMPTY_FRAME: Frame = { entries: [], log: [] };
+
+// Incoming packets rewrite the rendered lines several times a second, which
+// clears any selection sitting inside them. Updates are held while the user has
+// one anchored in the view so that ordinary copy and paste works. A range only
+// containing the view, as a select-all does, is not anchored in it.
+function hasSelectionIn(node: HTMLElement | null) {
+  if (node === null) return false;
+
+  const selection = window.getSelection();
+  if (selection === null || selection.isCollapsed) return false;
+
+  return (
+    node.contains(selection.anchorNode) || node.contains(selection.focusNode)
+  );
+}
+
 const TelemetryView = ({
   isDraggable = false,
   isUnlocked = false,
 }: TelemetryViewProps) => {
   const packets = useSelector((state: RootState) => state.telemetry);
 
+  const [filter, setFilter] = useState('');
+  const [isHeld, setIsHeld] = useState(false);
+
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let copyTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const onSelectionChange = () => setIsHeld(hasSelectionIn(bodyRef.current));
+
+    // The browser reads the selection into the clipboard once this event has
+    // been dispatched, so the lines may only be rewritten after that.
+    const onCopy = () => {
+      copyTimer = setTimeout(() => setIsHeld(false), 0);
+    };
+
+    const onBlur = () => setIsHeld(false);
+
+    document.addEventListener('selectionchange', onSelectionChange);
+    document.addEventListener('copy', onCopy);
+    window.addEventListener('blur', onBlur);
+
+    return () => {
+      if (copyTimer !== null) clearTimeout(copyTimer);
+
+      document.removeEventListener('selectionchange', onSelectionChange);
+      document.removeEventListener('copy', onCopy);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isHeld) return;
+
+    const timer = setTimeout(() => setIsHeld(false), HOLD_TIMEOUT);
+    return () => clearTimeout(timer);
+  }, [isHeld]);
+
   // A drawing-only batch leaves the last real frame in place.
-  const lastFrame = useRef<Frame>({ entries: [], log: [] });
+  const lastFrame = useRef<Frame>(EMPTY_FRAME);
+  const heldBatches = useRef<Telemetry[]>([]);
+  const seenPackets = useRef<Telemetry | null>(null);
 
   const { entries, log } = useMemo(() => {
-    const frame = buildFrame(packets);
+    // Each batch is taken once, so re-running for a hold change never replays one.
+    if (seenPackets.current !== packets) {
+      seenPackets.current = packets;
+
+      // An empty batch is the clear signal and is honoured even while held.
+      if (packets.length === 0) {
+        heldBatches.current = [];
+        lastFrame.current = EMPTY_FRAME;
+        return lastFrame.current;
+      }
+
+      heldBatches.current.push(packets);
+    }
+
+    if (isHeld || heldBatches.current.length === 0) return lastFrame.current;
+
+    const frame = buildFrame(heldBatches.current.flat());
+    heldBatches.current = [];
     if (frame !== null) lastFrame.current = frame;
     return lastFrame.current;
-  }, [packets]);
+  }, [packets, isHeld]);
+
+  const query = filter.trim().toLowerCase();
+  // A captioned item is matched on its caption, as in the keyed view; a bare
+  // line and a log entry have only their text.
+  const matches = ({ caption, value }: DisplayedLine) =>
+    query === '' || (caption ?? value).toLowerCase().includes(query);
 
   const [formatOverride, setFormatOverride] = useState<FormatOverride>(null);
   const [isMenuVisible, setIsMenuVisible] = useState(false);
@@ -139,7 +221,10 @@ const TelemetryView = ({
   return (
     <BaseView isUnlocked={isUnlocked}>
       <div className="flex-center">
-        <BaseViewHeading isDraggable={isDraggable}>
+        <BaseViewHeading
+          className="min-w-0 flex-1 basis-24 truncate"
+          isDraggable={isDraggable}
+        >
           Telemetry
           {/* An override is easy to set and forget, so say so rather than leaving someone to
               wonder why their telemetry renders differently here than anywhere else. */}
@@ -149,6 +234,25 @@ const TelemetryView = ({
             </span>
           )}
         </BaseViewHeading>
+        {isHeld && (
+          <span
+            className="mr-2 truncate text-xs text-gray-500 dark:text-slate-400"
+            title="Updates paused while text is selected"
+          >
+            paused
+          </span>
+        )}
+        <input
+          className="mr-2 w-20 min-w-[4rem] rounded border border-gray-500 bg-gray-100 px-2 py-0.5 text-sm transition-all placeholder:text-gray-600 focus:w-32 focus:ring-1 focus:ring-primary-500 dark:border-slate-500 dark:bg-slate-800 dark:text-slate-200 dark:placeholder:text-slate-400"
+          type="text"
+          placeholder="Filter"
+          aria-label="Filter telemetry"
+          value={filter}
+          onChange={(evt) => setFilter(evt.target.value)}
+          onKeyDown={(evt) => {
+            if (evt.key === 'Escape') setFilter('');
+          }}
+        />
         <div className="mr-3 flex items-center space-x-1">
           <button
             ref={menuButtonRef}
@@ -198,10 +302,14 @@ const TelemetryView = ({
         </div>
       </div>
       <BaseViewBody>
-        <div>
-          {entries.map((entry, i) => renderLine(`item-${i}`, entry))}
+        <div ref={bodyRef}>
+          {entries.map((entry, i) =>
+            matches(entry) ? renderLine(`item-${i}`, entry) : null,
+          )}
           {/* The log always sits below the telemetry items, matching the Driver Station. */}
-          {log.map((line, i) => renderLine(`log-${i}`, line))}
+          {log.map((line, i) =>
+            matches(line) ? renderLine(`log-${i}`, line) : null,
+          )}
         </div>
       </BaseViewBody>
     </BaseView>
