@@ -693,6 +693,45 @@ function unknownFields(x: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
+const DISPLAY_FORMATS = ['CLASSIC', 'MONOSPACE', 'HTML'];
+
+/** Telemetry fields that ride in extras reach views that trust their shape, so
+ *  a file's are rebuilt here and dropped when malformed. */
+function decodeExtras(x: Record<string, unknown>): Record<string, unknown> {
+  const out = unknownFields(x);
+  const drop = (key: string, ok: boolean) => {
+    if (key in out && !ok) delete out[key];
+  };
+
+  if (Array.isArray(out.items)) {
+    out.items = out.items
+      .filter(
+        (item): item is Record<string, unknown> =>
+          typeof item === 'object' && item !== null,
+      )
+      .map((item) => ({
+        caption: typeof item.caption === 'string' ? item.caption : null,
+        value: typeof item.value === 'string' ? item.value : '',
+      }));
+  }
+  drop('items', Array.isArray(out.items));
+  if (Array.isArray(out.markers)) {
+    out.markers = out.markers.filter((marker) => typeof marker === 'string');
+  }
+  drop('markers', Array.isArray(out.markers));
+  drop('captionValueSeparator', typeof out.captionValueSeparator === 'string');
+  drop('displayFormat', DISPLAY_FORMATS.includes(out.displayFormat as string));
+  drop('telemetryFrame', typeof out.telemetryFrame === 'boolean');
+  drop(
+    'logRange',
+    out.logRange === null ||
+      (Array.isArray(out.logRange) &&
+        out.logRange.length === 2 &&
+        out.logRange.every(Number.isInteger)),
+  );
+  return out;
+}
+
 /** TransportBar interpolates these into a title, and a value whose toString is
  *  not callable throws there during render. */
 function decodeStatus(value: object): Partial<RobotStatus> {
@@ -802,7 +841,7 @@ export function decode(value: unknown): DecodedRecording | null {
   const xdict = Array.isArray(rec.xdict)
     ? rec.xdict.map((x) =>
         typeof x === 'object' && x !== null && !Array.isArray(x)
-          ? unknownFields(x)
+          ? decodeExtras(x)
           : {},
       )
     : [{}];
