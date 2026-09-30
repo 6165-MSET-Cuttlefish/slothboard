@@ -86,7 +86,7 @@ public abstract class RecorderTestOpMode extends LinearOpMode {
             // `target` is deliberately absent from here on.
             p.put("phase", "DROPPED_TARGET");
             drawPath(p, t);
-            narrate(p, "2/8 stopped sending 'target'. It stays on screen; that is by design.");
+            narrate(p, "2/8 stopped sending 'target'. It leaves the Telemetry view, live and replayed alike.");
             send(p);
         }
         nextPhase();
@@ -98,7 +98,7 @@ public abstract class RecorderTestOpMode extends LinearOpMode {
             p.put("x", 40 * Math.cos(t) * pathSign());
             p.put("y", 40 * Math.sin(t * 0.7));
             p.put("heading", Math.sin(t) * 3);
-            p.addLine("STALL DETECTED");
+            p.addLogEntry("STALL DETECTED");
             drawPath(p, t);
             narrate(p, "3/8 emitting the SAME log line repeatedly.");
             send(p);
@@ -123,7 +123,7 @@ public abstract class RecorderTestOpMode extends LinearOpMode {
             p.put("x", 40 * Math.cos(t) * pathSign());
             p.put("y", 40 * Math.sin(t * 0.7));
             p.put("heading", Math.sin(t) * 3);
-            p.addLine("STALL DETECTED");
+            p.addLogEntry("STALL DETECTED");
             drawPath(p, t);
             narrate(p, "5/8 the SAME line again after silence. Must appear twice.");
             send(p);
