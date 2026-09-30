@@ -122,9 +122,13 @@ const TelemetryView = ({
 
     if (isHeld || heldBatches.current.length === 0) return lastFrame.current;
 
-    const frame = buildFrame(heldBatches.current.flat());
+    // Each batch replaces the frame, so held ones apply in order as unheld ones
+    // would; merging them would union shapes that never coexisted.
+    for (const batch of heldBatches.current) {
+      const frame = buildFrame(batch);
+      if (frame !== null) lastFrame.current = frame;
+    }
     heldBatches.current = [];
-    if (frame !== null) lastFrame.current = frame;
     return lastFrame.current;
   }, [packets, isHeld]);
 
