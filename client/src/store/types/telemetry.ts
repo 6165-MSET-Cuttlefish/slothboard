@@ -168,6 +168,9 @@ export type TelemetryItem = {
   /** Replay only: the state a seek landed on, not a packet the robot sent, so
    *  views that keep history skip it. */
   seed?: boolean;
+  /** Replay only, on a seed: the packets the Telemetry view shows at the seek
+   *  target, which may predate the prefill; empty when it shows nothing. */
+  telemetryTick?: TelemetryItem[];
 };
 
 export type ReceiveTelemetryAction = {

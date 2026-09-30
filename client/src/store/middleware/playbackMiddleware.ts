@@ -22,6 +22,7 @@ import {
   tickPlayback,
 } from '@/store/actions/playback';
 import { setReplayOverlay } from '@/store/actions/replay';
+import { telemetryContributes } from '@/components/views/TelemetryView/buildFrame';
 import {
   DecodedRecording,
   foldRange,
@@ -95,6 +96,10 @@ const CURSOR_DISPATCH_MS = 100;
 /** History re-sent after a seek, so the graph has a window to draw. */
 const PREFILL_MS = 8000;
 
+/** A live Telemetry frame spans one DashboardCore send, 100 ms by default, but
+ *  replay batches by tick, so the view rebuilds from this much of it. */
+export const TELEMETRY_WINDOW_MS = 100;
+
 type Store = MiddlewareAPI<Dispatch<AnyAction>, RootState>;
 
 // Module scope rather than store state: frames are large and churn at 50 Hz.
@@ -145,6 +150,52 @@ let leadOver = false;
 /** Each frame's encoded size. Compare mode re-buckets these whenever the
  *  timeline grows, and stringifying a long recording again would stall. */
 const frameBytes = new WeakMap<DecodedRecording, number[]>();
+/** Per frame, the newest frame at or before it since the last clear that the
+ *  Telemetry view would show, or -1: a seek can land long after it. */
+const telemetryFrames = new WeakMap<DecodedRecording, Int32Array>();
+
+function lastTelemetryFrames(recording: DecodedRecording): Int32Array {
+  const cached = telemetryFrames.get(recording);
+  if (cached) return cached;
+
+  const out = new Int32Array(recording.frames.length);
+  const state = foldTo(recording, -1);
+  let last = -1;
+  for (let i = 0; i < recording.frames.length; i++) {
+    for (const segment of foldRange(recording, state, i, i, (t) => t)) {
+      if (segment.kind === 'clear') last = -1;
+      else if (segment.packets.some(telemetryContributes)) last = i;
+    }
+    out[i] = last;
+  }
+  telemetryFrames.set(recording, out);
+  return out;
+}
+
+/** The packets within TELEMETRY_WINDOW_MS up to the newest one since the last
+ *  clear that the Telemetry view would show, as playback would have left it. */
+function telemetryTickAt(
+  recording: DecodedRecording,
+  targetIdx: number,
+  timestampFor: (t: number) => number,
+): TelemetryItem[] {
+  const idx = targetIdx < 0 ? -1 : lastTelemetryFrames(recording)[targetIdx];
+  if (idx < 0) return [];
+
+  const endMs = recording.frames[idx][0];
+  const state = foldTo(recording, endMs - TELEMETRY_WINDOW_MS);
+  let packets: TelemetryItem[] = [];
+  for (const segment of foldRange(
+    recording,
+    state,
+    state.frameIdx + 1,
+    idx,
+    timestampFor,
+  )) {
+    packets = segment.kind === 'clear' ? [] : [...packets, ...segment.packets];
+  }
+  return packets.filter(telemetryContributes);
+}
 
 function review(id: string | null) {
   if (reviewing === id) return;
@@ -455,7 +506,14 @@ function seekTo(store: Store, tMs: number) {
   for (const segment of segments) {
     if (segment.kind === 'batch') packets.push(...segment.packets);
   }
-  packets.push(seedPacket(rec, base, virtualTs(target, speed), target));
+  const seed = seedPacket(rec, base, virtualTs(target, speed), target);
+  // Compare mode leaves the Telemetry view live, so only playback needs this.
+  if (mode === 'playback') {
+    seed.telemetryTick = telemetryTickAt(rec, targetIdx, (t) =>
+      virtualTs(t, speed),
+    );
+  }
+  packets.push(seed);
 
   if (mode === 'ghost') {
     dispatchGhost(store, [{ kind: 'batch', packets }], true);

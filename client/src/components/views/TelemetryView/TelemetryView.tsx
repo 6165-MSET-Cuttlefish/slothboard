@@ -15,10 +15,12 @@ import sanitizeTelemetryHtml, {
   truncateTelemetry,
 } from '@/components/views/TelemetryView/sanitizeTelemetryHtml';
 import { RootState } from '@/store/reducers';
+import { TELEMETRY_WINDOW_MS } from '@/store/middleware/playbackMiddleware';
 import { Telemetry, TelemetryDisplayFormat } from '@/store/types/telemetry';
 import buildFrame, {
   DisplayedLine,
   Frame,
+  telemetryContributes,
 } from '@/components/views/TelemetryView/buildFrame';
 import useOnClickOutside from '@/hooks/useOnClickOutside';
 
@@ -113,6 +115,8 @@ const TelemetryView = ({
   // A drawing-only batch leaves the last real frame in place.
   const lastFrame = useRef<Frame>(EMPTY_FRAME);
   const heldBatches = useRef<Telemetry[]>([]);
+  // Replay batches by 25 ms tick, so its frame is rebuilt from a trailing window.
+  const replayTail = useRef<Telemetry>([]);
   const seenPackets = useRef<Telemetry | null>(null);
   const seenToken = useRef(`${foldToken}:${clearToken}`);
 
@@ -122,6 +126,7 @@ const TelemetryView = ({
     if (seenToken.current !== token) {
       seenToken.current = token;
       heldBatches.current = [];
+      replayTail.current = [];
       lastFrame.current = EMPTY_FRAME;
     }
 
@@ -132,6 +137,7 @@ const TelemetryView = ({
       // An empty batch is the clear signal and is honoured even while held.
       if (packets.length === 0) {
         heldBatches.current = [];
+        replayTail.current = [];
         lastFrame.current = EMPTY_FRAME;
         return lastFrame.current;
       }
@@ -144,7 +150,24 @@ const TelemetryView = ({
     // Each batch replaces the frame, so held ones apply in order as unheld ones
     // would; merging them would union shapes that never coexisted.
     for (const batch of heldBatches.current) {
-      const frame = buildFrame(batch);
+      const seed = batch.find((packet) => packet.seed === true);
+      let source = batch;
+      if (seed !== undefined) {
+        replayTail.current = seed.telemetryTick ?? [];
+        source = replayTail.current;
+      } else if (batch[0].recordedMs !== undefined) {
+        // Only telemetry moves the window: a drawing-only tick leaves the frame
+        // alone, as a drawing-only live batch does.
+        const fresh = batch.filter(telemetryContributes);
+        if (fresh.length === 0) continue;
+        const newestMs = fresh[fresh.length - 1].recordedMs ?? 0;
+        replayTail.current = [...replayTail.current, ...fresh].filter(
+          (packet) => (packet.recordedMs ?? 0) > newestMs - TELEMETRY_WINDOW_MS,
+        );
+        source = replayTail.current;
+      }
+
+      const frame = buildFrame(source);
       if (frame !== null) lastFrame.current = frame;
     }
     heldBatches.current = [];

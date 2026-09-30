@@ -56,17 +56,22 @@ function slotsOf(entries: DisplayedLine[]): (string | null)[] {
   });
 }
 
+// A pruned drawing-only packet looks empty, so empty counts only if declared telemetry.
+const contributes = (packet: TelemetryItem, entries: TelemetryEntry[]) =>
+  entries.length > 0 ||
+  (Array.isArray(packet.log) && packet.log.length > 0) ||
+  packet.telemetryFrame === true;
+
+/** Whether a packet has anything for a frame to show, unlike a drawing-only one. */
+export function telemetryContributes(packet: TelemetryItem): boolean {
+  return contributes(packet, entriesOf(packet));
+}
+
 /**
  * Packets are grouped by shape (their captions) so repeats of one loop collapse onto the newest
  * while different sources sit side by side. Grouping on shape is what lets bare lines survive.
  */
 export default function buildFrame(packets: Telemetry): Frame | null {
-  // A pruned drawing-only packet looks empty, so empty counts only if declared telemetry.
-  const contributes = (packet: TelemetryItem, entries: TelemetryEntry[]) =>
-    entries.length > 0 ||
-    (Array.isArray(packet.log) && packet.log.length > 0) ||
-    packet.telemetryFrame === true;
-
   const frames = packets
     .map((packet) => ({ packet, entries: entriesOf(packet) }))
     .filter(({ packet, entries }) => contributes(packet, entries));

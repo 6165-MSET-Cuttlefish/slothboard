@@ -166,6 +166,7 @@ const PACKET_KNOWN_FIELDS = new Set([
   'timestamp',
   'recordedMs',
   'seed',
+  'telemetryTick',
 ]);
 
 function frameFlags(f: Frame): number {
