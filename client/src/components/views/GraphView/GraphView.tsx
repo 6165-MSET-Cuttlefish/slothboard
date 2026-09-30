@@ -218,6 +218,24 @@ class GraphView extends Component<GraphViewProps, GraphViewState> {
     }
     if (!this.noOpmodeRunning(this.props) && this.noOpmodeRunning(prevProps)) {
       this.opmodePlay();
+      // A resumed recording drives the plot again: an in-graph replay left over
+      // from the pause would keep it frozen, and so would a scrub unless the
+      // panel itself is paused.
+      if (this.props.playbackMode === 'playback') {
+        this.cancelPlayback();
+        this.setState((state) => ({
+          playing: false,
+          scrubMs: state.userPaused ? state.scrubMs : null,
+        }));
+      }
+    }
+
+    // A load, seek or close re-bases the recording's clock, so an old scrub
+    // position would point into some other stretch of it. shownMs stays: the
+    // canvas already re-reported it in this same batch.
+    if (this.props.foldToken !== prevProps.foldToken) {
+      this.cancelPlayback();
+      this.setState({ scrubMs: null, playing: false });
     }
 
     if (this.opmodeRunStarted(this.props, prevProps)) this.resetHistory();
