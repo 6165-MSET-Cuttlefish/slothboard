@@ -41,6 +41,8 @@ class GraphCanvas extends React.Component {
     // time of the frame currently on the canvas
     this.lastRenderTimeMs = null;
 
+    this.reportedBounds = null;
+
     this.state = {
       graphEmpty: false,
       hover: null,
@@ -53,13 +55,13 @@ class GraphCanvas extends React.Component {
 
   componentDidMount() {
     this.graph = new Graph(this.canvasRef.current, this.props.options);
+
+    // no props change once the op mode is over, so draw now or nothing shows
+    this.renderGraph();
   }
 
   componentWillUnmount() {
-    if (this.requestId) {
-      cancelAnimationFrame(this.requestId);
-      this.requestId = 0;
-    }
+    this.cancelPendingFrame();
   }
 
   // TODO: Regretably, the current design requires that this.graph.add() only be called
@@ -77,14 +79,22 @@ class GraphCanvas extends React.Component {
       graphIsDirty = true;
     }
 
+    // a new op mode run starts the history over
+    if (this.props.runId !== prevProps.runId) {
+      this.graph.reset();
+      this.reportBounds();
+      graphIsDirty = true;
+    }
+
     if (!prevProps.paused && this.props.paused) this.frozenAt = Date.now();
-    if (prevProps.paused && !this.props.paused) {
-      if (!this.props.replayDriven) {
-        this.graph.reset();
-      } else if (!prevProps.userPaused) {
-        // The recording paused too, so what is plotted moves up to meet it.
-        this.graph.shift(Date.now() - (this.frozenAt ?? Date.now()));
-      }
+    if (
+      prevProps.paused &&
+      !this.props.paused &&
+      this.props.replayDriven &&
+      !prevProps.userPaused
+    ) {
+      // The recording paused too, so what is plotted moves up to meet it.
+      this.graph.shift(Date.now() - (this.frozenAt ?? Date.now()));
     }
 
     // Before the add below: a seek re-sends history older than what is plotted.
@@ -92,15 +102,26 @@ class GraphCanvas extends React.Component {
     if (didReset) {
       this.graph.reset();
       this.lastRenderTimeMs = null;
+      this.reportBounds();
     } else if (prevProps.showRecorded && !this.props.showRecorded) {
       this.graph.dropRecorded();
+      this.reportBounds();
       graphIsDirty = true;
     }
 
     const dataChanged = !isEqual(this.props.data, prevProps.data);
 
-    if (!this.props.paused && dataChanged) {
+    // samples are recorded even while paused so that the full history remains
+    // available for scrubbing
+    if (dataChanged) {
       this.graph.add(Date.now(), this.props.data, this.props.markers);
+      this.reportBounds();
+    }
+
+    if (prevProps.paused && !this.props.paused && !this.props.replayDriven) {
+      // pick playback back up at the newest sample rather than replaying the
+      // stretch of telemetry time that elapsed while paused
+      this.graph.resync(Date.now());
     }
 
     // With the RAF loop stopped this is the only place a paused plot repaints.
@@ -114,12 +135,12 @@ class GraphCanvas extends React.Component {
       // onResize needs this: pausedTime is nowhere near a scrubbed playhead.
       this.lastRenderTimeMs = now;
       this.frozenAt = now;
-      this.graph.add(now, this.props.data, this.props.markers);
-      this.setState(() => ({
-        graphEmpty: !this.graph.render(now),
-        hover: this.graph.getHover(),
-      }));
+      graphIsDirty = true;
+    } else if (dataChanged) {
+      graphIsDirty = true;
     }
+
+    if (this.props.scrubMs !== prevProps.scrubMs) graphIsDirty = true;
 
     if (!this.props.paused && !this.requestId) graphIsDirty = true;
 
@@ -153,13 +174,12 @@ class GraphCanvas extends React.Component {
 
     this.measureContainer();
 
-    // rendering prunes samples that have fallen out of the window, so a frozen
-    // frame has to be redrawn at the time it was first drawn at
+    // a frozen frame has to be redrawn at the time it was first drawn at
     const time = this.lastRenderTimeMs ?? this.props.pausedTime;
     this.lastRenderTimeMs = time;
 
     this.setState({
-      graphEmpty: !this.graph.render(time),
+      graphEmpty: !this.graph.render(time, this.props.scrubMs),
       hover: this.graph.getHover(),
     });
   }
@@ -300,26 +320,52 @@ class GraphCanvas extends React.Component {
     }
   }
 
+  // the parent needs the extent of the history to drive the scrub slider
+  reportBounds() {
+    if (!this.props.onTimeBounds) return;
+
+    const bounds = this.graph.getTimeBounds();
+    if (isEqual(bounds, this.reportedBounds)) return;
+
+    this.reportedBounds = bounds;
+    this.props.onTimeBounds(bounds);
+  }
+
+  cancelPendingFrame() {
+    if (this.requestId) {
+      cancelAnimationFrame(this.requestId);
+      this.requestId = 0;
+    }
+  }
+
   renderGraph() {
-    // Option changes call this while a frame is already queued; without the
-    // cancel each one would leave another loop running.
-    if (this.requestId) cancelAnimationFrame(this.requestId);
+    this.cancelPendingFrame();
+
+    // a paused plot is redrawn at the time of the frame it froze on
+    const time = this.props.paused
+      ? this.lastRenderTimeMs ?? this.props.pausedTime
+      : Date.now();
+    this.lastRenderTimeMs = time;
+
+    this.setState(() => ({
+      graphEmpty: !this.graph.render(time, this.props.scrubMs),
+      hover: this.graph.getHover(),
+    }));
 
     if (this.props.paused) {
-      // Option changes made while paused are visible without resuming.
-      this.graph.render(this.props.pausedTime);
-      this.requestId = 0;
+      this.reportShownTime(time);
     } else {
-      const time = Date.now();
-      this.lastRenderTimeMs = time;
-
-      this.setState(() => ({
-        graphEmpty: !this.graph.render(time),
-        hover: this.graph.getHover(),
-      }));
-
       this.requestId = requestAnimationFrame(this.renderGraph);
     }
+  }
+
+  reportShownTime(time) {
+    if (!this.props.onShownTime) return;
+
+    const shownMs = this.graph.shownMs(time, this.props.scrubMs);
+    if (isNaN(shownMs)) return;
+
+    this.props.onShownTime(shownMs);
   }
 
   render() {
@@ -390,6 +436,8 @@ class GraphCanvas extends React.Component {
 
 GraphCanvas.defaultProps = {
   markers: [],
+  scrubMs: null,
+  runId: 0,
 };
 
 GraphCanvas.propTypes = {
@@ -402,6 +450,12 @@ GraphCanvas.propTypes = {
   userPaused: PropTypes.bool,
   pausedTime: PropTypes.number.isRequired,
   resetToken: PropTypes.number,
+  // telemetry time shown at the right edge, or null to follow live data
+  scrubMs: PropTypes.number,
+  // changes to reset the recorded history (new op mode run)
+  runId: PropTypes.number,
+  onTimeBounds: PropTypes.func,
+  onShownTime: PropTypes.func,
 };
 
 export default GraphCanvas;
