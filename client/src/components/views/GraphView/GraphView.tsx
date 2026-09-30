@@ -605,9 +605,10 @@ class GraphView extends Component<GraphViewProps, GraphViewState> {
     });
   }
 
+  // Partial updates: a replay pauses in the same batch as the canvas reports
+  // new time bounds, which spreading this.state would put back.
   opmodePause() {
     this.setState({
-      ...this.state,
       opmodePaused: true,
       pausedTime: this.isPaused() ? this.state.pausedTime : Date.now(),
     });
@@ -622,7 +623,6 @@ class GraphView extends Component<GraphViewProps, GraphViewState> {
 
   opmodePlay() {
     this.setState({
-      ...this.state,
       opmodePaused: false,
     });
   }
