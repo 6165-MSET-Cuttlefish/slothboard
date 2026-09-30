@@ -720,10 +720,11 @@ export default class Graph {
 
     if (isNaN(graphNowMs)) return false;
 
-    // markers older than the retained history can never be scrolled back to
+    // no view starts earlier than a window (plus the 250 ms start lag) before
+    // the oldest retained sample, so markers older than that can go
     if (!isNaN(this.firstSampleMs)) {
-      const firstMs = this.firstSampleMs;
-      this.markers = this.markers.filter(({ t }) => t >= firstMs);
+      const cutoff = this.firstSampleMs - o.windowMs - 250;
+      this.markers = this.markers.filter(({ t }) => t >= cutoff);
     }
 
     const ranges = this.getVisibleRanges(graphNowMs - o.windowMs, graphNowMs);
