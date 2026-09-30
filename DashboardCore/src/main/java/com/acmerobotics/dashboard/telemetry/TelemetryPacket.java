@@ -54,6 +54,7 @@ public class TelemetryPacket {
     private SortedMap<String, String> data;
     private List<String> log;
     private long[] logRange;
+    private List<String> markers;
     private Canvas field;
     private Canvas fieldOverlay;
     private List<Item> items;
@@ -79,6 +80,7 @@ public class TelemetryPacket {
         items = new ArrayList<>();
         displayFormat = DisplayFormat.HTML;
         captionValueSeparator = DEFAULT_CAPTION_VALUE_SEPARATOR;
+        markers = new ArrayList<>();
         field = new Canvas();
         fieldOverlay = new Canvas();
 
@@ -217,6 +219,16 @@ public class TelemetryPacket {
 
     public String getCaptionValueSeparator() {
         return captionValueSeparator;
+    }
+
+    /** Marks this packet's instant with a label, drawn as a vertical line in the Graph View. */
+    public void addMarker(String label) {
+        markers.add(label == null ? "" : label);
+    }
+
+    /** Clears the markers in this packet. */
+    public void clearMarkers() {
+        markers.clear();
     }
 
     /**

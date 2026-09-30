@@ -356,6 +356,14 @@ class GraphView extends Component<GraphViewProps, GraphViewState> {
     const shownKeys = this.shownKeys();
     const seriesColors = this.seriesColors();
 
+    // markers sent from robot code share their packet's timestamp
+    const markers = this.props.telemetry.flatMap((packet) =>
+      (packet.markers ?? []).map((label) => ({
+        t: packet.timestamp,
+        label,
+      })),
+    );
+
     return (
       <BaseView
         className="flex flex-col overflow-auto"
@@ -434,6 +442,10 @@ class GraphView extends Component<GraphViewProps, GraphViewState> {
                 <p className="my-2 text-center">
                   Press the upper-right button to graph selected keys over time
                 </p>
+                <p className="my-2 text-center text-sm opacity-75">
+                  Click the graph to add a marker, type a label and press Enter;
+                  click a marker to remove it
+                </p>
                 <h3 className="mt-6 font-medium">Telemetry to graph:</h3>
                 <div className="ml-3">
                   <MultipleCheckbox
@@ -488,6 +500,7 @@ class GraphView extends Component<GraphViewProps, GraphViewState> {
                 {({ isDarkMode }) => (
                   <GraphCanvas
                     data={graphData}
+                    markers={markers}
                     options={{
                       windowMs: this.state.windowMs.valid
                         ? this.state.windowMs.value
@@ -507,6 +520,9 @@ class GraphView extends Component<GraphViewProps, GraphViewState> {
                       backgroundColor: isDarkMode
                         ? colors.slate[900]
                         : 'rgb(255, 255, 255)',
+                      markerColor: isDarkMode
+                        ? colors.slate[300]
+                        : colors.gray[600],
                     }}
                     paused={this.state.userPaused || this.state.opmodePaused}
                     pausedTime={this.state.pausedTime}

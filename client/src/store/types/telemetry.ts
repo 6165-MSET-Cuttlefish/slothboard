@@ -82,6 +82,8 @@ export type TelemetryItem = {
     ops: DrawOp[];
   };
   log: string[];
+  // labels for the packet's instant in time; absent on packets from older apps
+  markers?: string[];
   timestamp: number;
 
   // Absent on packets from older robots. `items` is the ordered display list; `data` the keyed view.
