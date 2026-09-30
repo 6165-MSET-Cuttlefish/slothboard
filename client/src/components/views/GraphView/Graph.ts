@@ -49,6 +49,11 @@ export const DEFAULT_OPTIONS: Options = {
   markerLineWidth: 1, // device pixels
 };
 
+export const RECORDED_SUFFIX = '(rec)';
+/** Recorded series are told apart by the dash alone: on the dark theme, alpha
+ *  pulls a line toward the background and off its live twin's colour. */
+const DASH_PATTERN = [5, 4];
+
 function niceNum(range: number, round: boolean) {
   const exponent = Math.floor(Math.log10(range));
   const fraction = range / Math.pow(10, exponent);
@@ -152,6 +157,7 @@ function scale(
 type Sample = {
   name: string;
   value: number;
+  recorded?: boolean;
 };
 
 // index of the sample in ts (sorted ascending) whose time is closest to t
@@ -278,7 +284,7 @@ export default class Graph {
   ctx: CanvasRenderingContext2D;
   options: Options;
 
-  data: { [key: string]: { ts: number[]; vs: number[] } };
+  data: { [key: string]: { ts: number[]; vs: number[]; dashed: boolean } };
   markers: Marker[];
 
   beginGraphNowMs = Number.NaN; // in telemetry time
@@ -326,6 +332,11 @@ export default class Graph {
     this.beginRenderTimeMs = Number.NaN; // in browser time
 
     this.hover = null;
+
+    // Dropping samples does not clear pixels: render() is the only repaint
+    // and it is gated on not being paused, so the curves would stay frozen.
+    // eslint-disable-next-line no-self-assign
+    this.canvas.width = this.canvas.width;
   }
 
   // x and y are in CSS pixels relative to the canvas; pass null to clear
@@ -356,8 +367,28 @@ export default class Graph {
       .map(({ name }) => name);
   }
 
-  colorFor(name: string) {
+  /** Moves every sample `ms` later. */
+  shift(ms: number) {
+    for (const { ts } of Object.values(this.data)) {
+      for (let i = 0; i < ts.length; i++) ts[i] += ms;
+    }
+  }
+
+  /** Recorded series must leave the key and the y-axis range, and reset() would
+   *  take the live plot down with them. */
+  dropRecorded() {
+    for (const key of Object.keys(this.data)) {
+      if (this.data[key].dashed) delete this.data[key];
+    }
+  }
+
+  colorFor(key: string) {
     const o = this.options;
+
+    // A recorded twin wears its live series' colour; the dash tells them apart.
+    const name = this.data[key]?.dashed
+      ? key.slice(0, -` ${RECORDED_SUFFIX}`.length)
+      : key;
 
     if (Object.prototype.hasOwnProperty.call(o.seriesColors, name))
       return o.seriesColors[name];
@@ -370,6 +401,8 @@ export default class Graph {
   }
 
   add(time: number, samples: Sample[][], markers: Marker[] = []) {
+    let plotted = false;
+
     for (const { t, label } of markers) {
       if (isNaN(t)) continue;
 
@@ -383,26 +416,35 @@ export default class Graph {
       );
 
       for (const series of sample) {
-        const { name, value } = series;
+        const { name, value, recorded } = series;
 
         if (name === 'time') continue;
 
-        if (isNaN(value)) continue;
+        // Not isNaN: Java stringifies 1.0/0.0 as "Infinity", and one such value
+        // gives getYAxisScaling a NaN range that blanks every plotted series.
+        if (!Number.isFinite(value)) continue;
 
-        if (!Object.prototype.hasOwnProperty.call(this.data, name)) {
-          this.data[name] = {
+        const key = recorded ? `${name} ${RECORDED_SUFFIX}` : name;
+
+        if (!Object.prototype.hasOwnProperty.call(this.data, key)) {
+          this.data[key] = {
             ts: [],
             vs: [],
+            dashed: recorded === true,
           };
         }
 
-        const { ts, vs } = this.data[name];
+        const { ts, vs } = this.data[key];
         ts.push(t);
         vs.push(value);
+        plotted = true;
       }
     }
 
-    if (isNaN(this.beginGraphNowMs) && samples.length > 0) {
+    // `plotted`, not `samples.length`: a batch can carry a time row and no
+    // series, and a synthetic one's timestamp of 0 would anchor the plot clock
+    // and push every later sample off screen.
+    if (isNaN(this.beginGraphNowMs) && plotted) {
       const maxT = samples[samples.length - 1].reduce(
         (acc, { name, value }) => (name === 'time' ? value : acc),
         Number.NaN,
@@ -575,15 +617,18 @@ export default class Graph {
       const lineY = y + i * (o.fontSize + o.keySpacing) + o.fontSize / 2;
       const name = names[i];
       const color = this.colorFor(name);
+      const { dashed } = this.data[name];
       const lineWidth =
         this.ctx.measureText(name).width + o.keyLineLength + o.keySpacing;
       const lineX = x + (width - lineWidth) / 2;
 
       this.ctx.strokeStyle = color;
+      this.ctx.setLineDash(dashed ? DASH_PATTERN : []);
       this.ctx.beginPath();
       fineMoveTo(this.ctx, this.scaling, lineX, lineY);
       fineLineTo(this.ctx, this.scaling, lineX + o.keyLineLength, lineY);
       this.ctx.stroke();
+      this.ctx.setLineDash([]);
 
       this.ctx.fillStyle = o.textColor;
       this.ctx.fillText(name, lineX + o.keyLineLength + o.keySpacing, lineY);
@@ -930,12 +975,13 @@ export default class Graph {
     this.orderedNames()
       .reverse()
       .forEach((k) => {
-        const { ts, vs } = this.data[k];
+        const { ts, vs, dashed } = this.data[k];
 
         if (ts.length === 0) return;
 
         this.ctx.beginPath();
         this.ctx.strokeStyle = this.colorFor(k);
+        this.ctx.setLineDash(dashed ? DASH_PATTERN : []);
         fineMoveTo(
           this.ctx,
           this.scaling,
@@ -951,6 +997,7 @@ export default class Graph {
           );
         }
         this.ctx.stroke();
+        this.ctx.setLineDash([]);
       });
 
     this.ctx.restore();

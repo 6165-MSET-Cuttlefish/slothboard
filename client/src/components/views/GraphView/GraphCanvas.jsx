@@ -58,6 +58,7 @@ class GraphCanvas extends React.Component {
   componentWillUnmount() {
     if (this.requestId) {
       cancelAnimationFrame(this.requestId);
+      this.requestId = 0;
     }
   }
 
@@ -76,12 +77,48 @@ class GraphCanvas extends React.Component {
       graphIsDirty = true;
     }
 
+    if (!prevProps.paused && this.props.paused) this.frozenAt = Date.now();
     if (prevProps.paused && !this.props.paused) {
-      this.graph.reset();
+      if (!this.props.replayDriven) {
+        this.graph.reset();
+      } else if (!prevProps.userPaused) {
+        // The recording paused too, so what is plotted moves up to meet it.
+        this.graph.shift(Date.now() - (this.frozenAt ?? Date.now()));
+      }
     }
 
-    if (!this.props.paused && !isEqual(this.props.data, prevProps.data)) {
+    // Before the add below: a seek re-sends history older than what is plotted.
+    const didReset = prevProps.resetToken !== this.props.resetToken;
+    if (didReset) {
+      this.graph.reset();
+      this.lastRenderTimeMs = null;
+    } else if (prevProps.showRecorded && !this.props.showRecorded) {
+      this.graph.dropRecorded();
+      graphIsDirty = true;
+    }
+
+    const dataChanged = !isEqual(this.props.data, prevProps.data);
+
+    if (!this.props.paused && dataChanged) {
       this.graph.add(Date.now(), this.props.data, this.props.markers);
+    }
+
+    // With the RAF loop stopped this is the only place a paused plot repaints.
+    // The panel's own Pause holds it still as the replay plays, but not a seek.
+    if (
+      this.props.replayDriven &&
+      this.props.paused &&
+      (didReset || (dataChanged && !this.props.userPaused))
+    ) {
+      const now = Date.now();
+      // onResize needs this: pausedTime is nowhere near a scrubbed playhead.
+      this.lastRenderTimeMs = now;
+      this.frozenAt = now;
+      this.graph.add(now, this.props.data, this.props.markers);
+      this.setState(() => ({
+        graphEmpty: !this.graph.render(now),
+        hover: this.graph.getHover(),
+      }));
     }
 
     if (!this.props.paused && !this.requestId) graphIsDirty = true;
@@ -356,11 +393,15 @@ GraphCanvas.defaultProps = {
 };
 
 GraphCanvas.propTypes = {
+  showRecorded: PropTypes.bool,
+  replayDriven: PropTypes.bool,
   data: PropTypes.arrayOf(PropTypes.any).isRequired,
   markers: PropTypes.arrayOf(PropTypes.any),
   options: PropTypes.object.isRequired,
   paused: PropTypes.bool.isRequired,
+  userPaused: PropTypes.bool,
   pausedTime: PropTypes.number.isRequired,
+  resetToken: PropTypes.number,
 };
 
 export default GraphCanvas;

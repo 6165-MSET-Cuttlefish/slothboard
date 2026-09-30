@@ -10,6 +10,7 @@ import BaseView, {
   BaseViewProps,
   BaseViewHeadingProps,
 } from '@/components/views/BaseView';
+import ReplayBadge from '@/components/views/ReplayBadge';
 import sanitizeTelemetryHtml, {
   truncateTelemetry,
 } from '@/components/views/TelemetryView/sanitizeTelemetryHtml';
@@ -61,6 +62,15 @@ const TelemetryView = ({
   isUnlocked = false,
 }: TelemetryViewProps) => {
   const packets = useSelector((state: RootState) => state.telemetry);
+  const isReplay = useSelector(
+    (state: RootState) => state.playback.mode === 'playback',
+  );
+  // Both tokens reset the frame. Logging and the Graph keep history, so they
+  // honour only foldToken: a replayed clear must not wipe what live runs keep.
+  const foldToken = useSelector((state: RootState) => state.playback.foldToken);
+  const clearToken = useSelector(
+    (state: RootState) => state.playback.clearToken,
+  );
 
   const [filter, setFilter] = useState('');
   const [isHeld, setIsHeld] = useState(false);
@@ -104,9 +114,18 @@ const TelemetryView = ({
   const lastFrame = useRef<Frame>(EMPTY_FRAME);
   const heldBatches = useRef<Telemetry[]>([]);
   const seenPackets = useRef<Telemetry | null>(null);
+  const seenToken = useRef(`${foldToken}:${clearToken}`);
 
   const { entries, log } = useMemo(() => {
-    // Each batch is taken once, so re-running for a hold change never replays one.
+    // The tokens, not packets.length: a seek sends no empty batch.
+    const token = `${foldToken}:${clearToken}`;
+    if (seenToken.current !== token) {
+      seenToken.current = token;
+      heldBatches.current = [];
+      lastFrame.current = EMPTY_FRAME;
+    }
+
+    // Each batch is taken once, so a hold or token change never replays one.
     if (seenPackets.current !== packets) {
       seenPackets.current = packets;
 
@@ -130,7 +149,7 @@ const TelemetryView = ({
     }
     heldBatches.current = [];
     return lastFrame.current;
-  }, [packets, isHeld]);
+  }, [packets, isHeld, foldToken, clearToken]);
 
   const query = filter.trim().toLowerCase();
   // A captioned item is matched on its caption, as in the keyed view; a bare
@@ -237,6 +256,7 @@ const TelemetryView = ({
               {formatOverride.toLowerCase()}
             </span>
           )}
+          {isReplay && <ReplayBadge source="replacing" />}
         </BaseViewHeading>
         {isHeld && (
           <span
