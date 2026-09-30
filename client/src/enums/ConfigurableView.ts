@@ -14,4 +14,5 @@ export enum ConfigurableView {
   ERROR_VIEW,
   LIMELIGHT_VIEW,
   LOG_VIEW,
+  LOOP_TIME_VIEW,
 }

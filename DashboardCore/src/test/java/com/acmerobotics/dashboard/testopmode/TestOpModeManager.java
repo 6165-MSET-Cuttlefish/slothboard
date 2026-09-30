@@ -2,6 +2,7 @@ package com.acmerobotics.dashboard.testopmode;
 
 import com.acmerobotics.dashboard.SendFun;
 import com.acmerobotics.dashboard.TestFieldVersatilityOpMode;
+import com.acmerobotics.dashboard.TestLoopTimerOpMode;
 import com.acmerobotics.dashboard.TestSineWaveOpMode;
 import com.acmerobotics.dashboard.TestTelemetryOpMode;
 import java.util.Arrays;
@@ -12,7 +13,8 @@ public class TestOpModeManager {
             Arrays.asList(
                     new TestSineWaveOpMode(),
                     new TestFieldVersatilityOpMode(),
-                    new TestTelemetryOpMode());
+                    new TestTelemetryOpMode(),
+                    new TestLoopTimerOpMode());
     private TestOpMode activeOpMode = null;
 
     SendFun sendFun;
