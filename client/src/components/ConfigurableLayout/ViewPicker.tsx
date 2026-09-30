@@ -27,9 +27,11 @@ type ViewPickerProps = {
   disabledViews?: Set<ConfigurableView>;
 };
 
+// Two columns of the combined build's views run 8 rows, past the top of a
+// laptop-height window, so shorter windows get three or four.
 const Container = (props: PropsWithChildren<ViewPickerProps>) => (
   <div
-    className="pointer-events-none fixed grid grid-cols-2 gap-x-6 gap-y-5"
+    className="pointer-events-none fixed grid grid-cols-2 gap-x-6 gap-y-5 [@media(max-height:940px)]:grid-cols-3 [@media(max-height:720px)]:grid-cols-4"
     style={{ bottom: props.bottom, right: props.right }}
   >
     {props.children}
