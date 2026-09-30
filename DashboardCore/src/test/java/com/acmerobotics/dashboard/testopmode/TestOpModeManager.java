@@ -1,6 +1,7 @@
 package com.acmerobotics.dashboard.testopmode;
 
 import com.acmerobotics.dashboard.SendFun;
+import com.acmerobotics.dashboard.TestColorSensorOpMode;
 import com.acmerobotics.dashboard.TestFieldVersatilityOpMode;
 import com.acmerobotics.dashboard.TestLoopTimerOpMode;
 import com.acmerobotics.dashboard.TestSineWaveOpMode;
@@ -14,7 +15,8 @@ public class TestOpModeManager {
                     new TestSineWaveOpMode(),
                     new TestFieldVersatilityOpMode(),
                     new TestTelemetryOpMode(),
-                    new TestLoopTimerOpMode());
+                    new TestLoopTimerOpMode(),
+                    new TestColorSensorOpMode());
     private TestOpMode activeOpMode = null;
 
     SendFun sendFun;

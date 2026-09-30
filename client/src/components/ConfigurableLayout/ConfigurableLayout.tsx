@@ -31,6 +31,7 @@ import ErrorView from '@/components/views/ErrorView/ErrorView';
 import LimelightView from '@/components/views/LimelightView';
 import LogView from '@/components/views/LogView/LogView';
 import LoopTimeView from '@/components/views/LoopTimeView';
+import ColorView from '@/components/views/ColorView';
 
 import RadialFab from './RadialFab/RadialFab';
 import RadialFabChild from './RadialFab/RadialFabChild';
@@ -104,6 +105,7 @@ const VIEW_MAP: { [key in ConfigurableView]: ReactElement } = {
   [ConfigurableView.LIMELIGHT_VIEW]: <LimelightView />,
   [ConfigurableView.LOG_VIEW]: <LogView />,
   [ConfigurableView.LOOP_TIME_VIEW]: <LoopTimeView />,
+  [ConfigurableView.COLOR_VIEW]: <ColorView />,
 };
 
 const LOCAL_STORAGE_LAYOUT_KEY = 'configurableLayoutStorage';

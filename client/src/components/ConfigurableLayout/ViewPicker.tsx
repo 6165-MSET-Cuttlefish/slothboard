@@ -15,6 +15,7 @@ import { ReactComponent as GamepadIcon } from '@/assets/icons/gamepad.svg';
 import { ReactComponent as ExclamationIcon } from '@/assets/icons/exclamation.svg';
 import { ReactComponent as TerminalIcon } from '@/assets/icons/terminal.svg';
 import { ReactComponent as TimerIcon } from '@/assets/icons/timer.svg';
+import { ReactComponent as ColorLensIcon } from '@/assets/icons/color_lens.svg';
 
 type ViewPickerProps = {
   isOpen: boolean;
@@ -175,6 +176,13 @@ const listContent = [
     icon: <TimerIcon className="h-6 w-6 text-white" />,
     customStyles: 'focus:ring-amber-600',
     iconBg: 'bg-amber-500',
+  },
+  {
+    title: 'Color View',
+    view: ConfigurableView.COLOR_VIEW,
+    icon: <ColorLensIcon className="h-6 w-6 text-white" />,
+    customStyles: 'focus:ring-rose-600',
+    iconBg: 'bg-rose-500',
   },
 ];
 

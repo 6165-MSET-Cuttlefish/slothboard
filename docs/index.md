@@ -35,6 +35,8 @@ layout: default
 
 * [Loop Time View](features#loop-time-view)
 
+* [Color View](features#color-view)
+
 [Competition Use](competition)
 
 [Samples](https://github.com/acmerobotics/ftc-dashboard/tree/master/TeamCode/src/main/java/org/firstinspires/ftc/teamcode)
