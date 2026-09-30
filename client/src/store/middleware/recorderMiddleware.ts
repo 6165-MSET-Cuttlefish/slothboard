@@ -559,7 +559,12 @@ function newSession(
 
 function noteContent(s: Session, packets: TelemetryItem[]) {
   for (const p of packets) {
-    if (Object.keys(p.data ?? {}).length > 0 || (p.log?.length ?? 0) > 0) {
+    // Bare lines ride in items with no data key.
+    if (
+      Object.keys(p.data ?? {}).length > 0 ||
+      (p.log?.length ?? 0) > 0 ||
+      (Array.isArray(p.items) && p.items.length > 0)
+    ) {
       s.sawTelemetry = true;
     }
     if ((p.fieldOverlay?.ops?.length ?? 0) > 0) s.sawField = true;
