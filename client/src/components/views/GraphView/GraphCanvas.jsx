@@ -109,7 +109,9 @@ class GraphCanvas extends React.Component {
       graphIsDirty = true;
     }
 
-    const dataChanged = !isEqual(this.props.data, prevProps.data);
+    // By batch, not by equal rows: a mode switch or reorder rebuilds the rows
+    // of the batch already added, and adding them again repeats its markers.
+    const dataChanged = this.props.batch !== prevProps.batch;
 
     // samples are recorded even while paused so that the full history remains
     // available for scrubbing
@@ -444,6 +446,8 @@ GraphCanvas.defaultProps = {
 };
 
 GraphCanvas.propTypes = {
+  // the telemetry batch the rows come from; a new one is added once
+  batch: PropTypes.arrayOf(PropTypes.any),
   showRecorded: PropTypes.bool,
   replayDriven: PropTypes.bool,
   data: PropTypes.arrayOf(PropTypes.any).isRequired,

@@ -1031,6 +1031,7 @@ class GraphView extends Component<GraphViewProps, GraphViewState> {
                 <ThemeConsumer>
                   {({ isDarkMode }) => (
                     <GraphCanvas
+                      batch={this.props.telemetry}
                       data={graphData}
                       markers={markers}
                       options={{
