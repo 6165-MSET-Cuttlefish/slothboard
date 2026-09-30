@@ -111,7 +111,9 @@ export const ColorPalette = ({
         'focus:outline-none dark:border-slate-600 dark:bg-slate-800',
       )}
       tabIndex={-1}
-      onKeyDown={(evt) => {
+      // Capture: the graph's own Escape listener is native and would see a
+      // bubbling event before this one could stop it.
+      onKeyDownCapture={(evt) => {
         if (evt.key === 'Escape') {
           evt.stopPropagation();
           onClose();
