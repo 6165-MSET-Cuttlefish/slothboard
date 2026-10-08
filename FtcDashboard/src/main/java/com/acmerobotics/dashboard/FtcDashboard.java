@@ -114,6 +114,8 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications, DashboardT
 
     private static boolean suppressOpMode = false;
 
+    private static final String TOGGLE_OP_MODE_NAME = "Enable/Disable Dashboard";
+
     private static final String PREFS_NAME = "FtcDashboard";
     private static final String PREFS_AUTO_ENABLE_KEY = "autoEnable";
 
@@ -126,7 +128,7 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications, DashboardT
                 if (instance != null && !suppressOpMode) {
                     registrationHelper.register(
                             new OpModeMeta.Builder()
-                                    .setName("Enable/Disable Dashboard")
+                                    .setName(TOGGLE_OP_MODE_NAME)
                                     .setFlavor(OpModeMeta.Flavor.TELEOP)
                                     .setGroup("dash")
                                     .build(),
@@ -296,7 +298,8 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications, DashboardT
         List<OpModeInfo> infoList = new ArrayList<>();
 
         for (OpModeMeta opModeMeta : SinisterRegisteredOpModes.INSTANCE.getOpModes()) {
-            if (opModeMeta.flavor != OpModeMeta.Flavor.SYSTEM) {
+            if (opModeMeta.flavor != OpModeMeta.Flavor.SYSTEM
+                    && !TOGGLE_OP_MODE_NAME.equals(opModeMeta.name)) {
                 infoList.add(new OpModeInfo(opModeMeta.name, opModeMeta.group));
             }
         }
@@ -1025,6 +1028,9 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications, DashboardT
                 case INIT_OP_MODE:
                     {
                         String opModeName = ((InitOpMode) msg).getOpModeName();
+                        if (TOGGLE_OP_MODE_NAME.equals(opModeName)) {
+                            break;
+                        }
                         opModeManager.initOpMode(opModeName);
                         break;
                     }

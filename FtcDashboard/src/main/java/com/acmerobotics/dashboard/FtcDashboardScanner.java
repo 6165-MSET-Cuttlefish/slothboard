@@ -70,12 +70,6 @@ public final class FtcDashboardScanner implements Scanner {
         });
     }
 
-    @Override
-    public void afterUnload(@NonNull ClassLoader loader) {
-        Logger.v(TAG, "updating OpMode List");
-        FtcDashboard.getInstance().sendOpModes();
-    }
-
     private final SearchTarget searchTarget = new NarrowSearch();
     @NonNull
     @Override
