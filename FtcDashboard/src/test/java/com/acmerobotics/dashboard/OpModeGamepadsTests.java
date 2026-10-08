@@ -10,7 +10,6 @@ import com.qualcomm.robotcore.hardware.Gamepad;
 import java.lang.reflect.Method;
 import org.junit.jupiter.api.Test;
 
-/** Runs dashboard gamepad delivery against the SDK's own per-loop gamepad handling. */
 public class OpModeGamepadsTests {
     static final class Iterative extends OpMode {
         @Override
@@ -31,7 +30,6 @@ public class OpModeGamepadsTests {
         return opMode;
     }
 
-    /** What the SDK runs before every init_loop() and loop() of an iterative op mode. */
     private static void beforeLoop(OpMode opMode) throws Exception {
         Method preUserCode = OpMode.class.getDeclaredMethod("internalPreUserCode");
         preUserCode.setAccessible(true);

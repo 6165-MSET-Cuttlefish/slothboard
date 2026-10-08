@@ -274,7 +274,6 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications, DashboardT
     private ExecutorService logcatCaptureExecutor;
     private volatile LogcatMonitorRunnable logcatCaptureRunnable;
 
-    // Not the wall clock: the SDK sets that from the Driver Station when one connects.
     private long lastGamepadTimestamp;
 
     private boolean webServerAttached;
@@ -326,7 +325,6 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications, DashboardT
         @Override
         public void run() {
             while (!Thread.currentThread().isInterrupted()) {
-                // Under updateGamepads' lock, so no delivery lands between the rest and the clear.
                 long sleepMs =
                         activeOpMode.with(
                                 o -> {
@@ -1927,7 +1925,6 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications, DashboardT
                 o -> {
                     o.opMode = opMode;
                     o.status = RobotStatus.OpModeStatus.STOPPED;
-                    // An op mode registered as an instance runs again with what it last received.
                     OpModeGamepads.rest(opMode);
                 });
 

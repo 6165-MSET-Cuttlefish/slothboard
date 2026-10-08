@@ -6,11 +6,6 @@ import com.qualcomm.robotcore.util.RobotLog;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
-/**
- * Hands gamepad state to an op mode the way the SDK hands it a Driver Station packet. An iterative
- * op mode copies the latest packet over gamepad1 and gamepad2 before every loop, so state written
- * straight into those fields only ever reaches a LinearOpMode.
- */
 final class OpModeGamepads {
     private static final String TAG = "OpModeGamepads";
 
@@ -18,7 +13,6 @@ final class OpModeGamepads {
 
     private OpModeGamepads() {}
 
-    /** The dashboard only drives gamepads that no Driver Station gamepad is assigned to. */
     static boolean unassociated(OpMode opMode) {
         return opMode.gamepad1.getGamepadId() == Gamepad.ID_UNASSOCIATED
                 && opMode.gamepad2.getGamepadId() == Gamepad.ID_UNASSOCIATED;
@@ -30,7 +24,6 @@ final class OpModeGamepads {
         }
     }
 
-    /** The op mode must not see later changes to either gamepad, so pass fresh ones. */
     static void deliver(OpMode opMode, Gamepad gamepad1, Gamepad gamepad2) {
         if (NEW_GAMEPAD_DATA_AVAILABLE == null) {
             opMode.gamepad1.copy(gamepad1);
