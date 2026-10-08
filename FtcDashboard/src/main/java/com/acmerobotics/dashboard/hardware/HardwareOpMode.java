@@ -3,7 +3,6 @@ package com.acmerobotics.dashboard.hardware;
 import static org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit.AMPS;
 
 import com.acmerobotics.dashboard.FtcDashboard;
-import com.acmerobotics.dashboard.config.ValueProvider;
 import com.acmerobotics.dashboard.config.VariableProvider;
 import com.acmerobotics.dashboard.config.variable.BasicVariable;
 import com.acmerobotics.dashboard.config.variable.ConfigVariable;
@@ -103,14 +102,10 @@ public class HardwareOpMode extends OpMode {
                         });
     }
 
-    /**
-     * Drops the color sensor readings, which the Color view would otherwise go on presenting as a
-     * live match verdict. Nothing else clears the hardware tree between op modes.
-     */
     @Override
     public void stop() {
         FtcDashboard.getInstance()
-                .withHardwareRoot(hardwareRoot -> hardwareRoot.removeVariable("Color Sensors"));
+                .withConfigRoot(root -> root.removeVariable(FtcDashboard.HARDWARE_CATEGORY));
     }
 
     /* -------------------- Initialization --------------------- */
@@ -198,23 +193,7 @@ public class HardwareOpMode extends OpMode {
         CustomVariable motorVar = new CustomVariable();
         String hubType = extractHubType(motor.getController().getConnectionInfo());
 
-        motorVar.putVariable(
-                "Power",
-                new BasicVariable<>(
-                        new ValueProvider<Double>() {
-                            private double value = 0.0;
-
-                            @Override
-                            public Double get() {
-                                return value;
-                            }
-
-                            @Override
-                            public void set(Double newValue) {
-                                value = newValue;
-                                motor.setPower(newValue);
-                            }
-                        }));
+        motorVar.putVariable("Power", createVariableFromValue(0.0));
 
         motorVar.putVariable(
                 "Current Position",
@@ -288,6 +267,11 @@ public class HardwareOpMode extends OpMode {
             } catch (Exception e) {
                 System.out.println("Error setting target position: " + e);
             }
+        }
+
+        ConfigVariable<?> powerVar = config.getVariable("Power");
+        if (powerVar != null) {
+            motor.setPower((Double) powerVar.getValue());
         }
     }
 
@@ -455,23 +439,7 @@ public class HardwareOpMode extends OpMode {
         CustomVariable servoVar = new CustomVariable();
         String hubType = extractHubType(servo.getController().getConnectionInfo());
 
-        servoVar.putVariable(
-                "Power",
-                new BasicVariable<>(
-                        new ValueProvider<Double>() {
-                            private double value = 0.0;
-
-                            @Override
-                            public Double get() {
-                                return value;
-                            }
-
-                            @Override
-                            public void set(Double newValue) {
-                                value = newValue;
-                                servo.setPower(newValue);
-                            }
-                        }));
+        servoVar.putVariable("Power", createVariableFromValue(0.0));
 
         servoVar.putVariable(
                 hubType + " Port",
