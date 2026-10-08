@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.acmerobotics.dashboard.config.ConstantProvider;
 import com.acmerobotics.dashboard.config.VariableProvider;
 import com.acmerobotics.dashboard.config.reflection.ReflectionConfig;
 import com.acmerobotics.dashboard.message.Message;
@@ -136,7 +135,7 @@ public class EnumConfigClassLoaderTests {
     @Test
     public void snapshotsEnumValuesForTheBaseline() {
         DashboardCore core = register(Holder.class);
-        core.addConfigVariable("Extra", "count", new ConstantProvider<>(1));
+        core.captureConfigBaseline("Holder");
 
         List<Message> sent = new ArrayList<>();
         core.newSocket(sent::add)

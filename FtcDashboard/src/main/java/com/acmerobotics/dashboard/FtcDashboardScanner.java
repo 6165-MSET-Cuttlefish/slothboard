@@ -42,12 +42,14 @@ public final class FtcDashboardScanner implements Scanner {
                 root.putVariable(name, ReflectionConfig.createVariableFromClass(cls));
             }
         });
+        FtcDashboard.getInstance().captureConfigBaseline(altName.isEmpty() ? name : altName);
     }
 
     @Override
     public void afterScan(@NonNull ClassLoader loader) {
         Logger.v(TAG, "updating OpMode List");
         FtcDashboard.getInstance().sendOpModes();
+        FtcDashboard.getInstance().sendConfigBaseline();
     }
 
     @Override
@@ -68,6 +70,7 @@ public final class FtcDashboardScanner implements Scanner {
                 root.removeVariable(name);
             }
         });
+        FtcDashboard.getInstance().removeConfigBaseline(altName.isEmpty() ? name : altName);
     }
 
     private final SearchTarget searchTarget = new NarrowSearch();

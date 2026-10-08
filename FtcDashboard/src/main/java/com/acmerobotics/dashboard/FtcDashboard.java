@@ -1586,6 +1586,18 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications, DashboardT
                 });
     }
 
+    void captureConfigBaseline(String category) {
+        core.captureConfigBaseline(category);
+    }
+
+    void removeConfigBaseline(String category) {
+        core.removeConfigBaseline(category);
+    }
+
+    void sendConfigBaseline() {
+        core.sendConfigBaseline();
+    }
+
     /**
      * Add config variable with custom provider that is automatically removed when op mode ends.
      *
