@@ -289,6 +289,8 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications, DashboardT
 
     private final LimelightProxyManager limelightProxyManager = new LimelightProxyManager();
 
+    private final UserCodeCrash userCodeCrash = new UserCodeCrash(System.currentTimeMillis());
+
     private static class OpModeAndStatus {
         public OpMode opMode;
         public RobotStatus.OpModeStatus status = RobotStatus.OpModeStatus.STOPPED;
@@ -458,6 +460,7 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications, DashboardT
 
     private class LogcatMonitorRunnable implements Runnable {
         private static final String OPMODE_MANAGER_TAG = "OpModeManager";
+        private static final String OPEN_CV_CAMERA_TAG = "OpenCvCamera";
 
         private final boolean opModeManagerOnly;
 
@@ -490,7 +493,8 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications, DashboardT
                                         "-v",
                                         "threadtime",
                                         "-s",
-                                        OPMODE_MANAGER_TAG + ":*")
+                                        OPMODE_MANAGER_TAG + ":*",
+                                        OPEN_CV_CAMERA_TAG + ":E")
                                 : new ProcessBuilder("logcat", "-v", "threadtime", "-T", "1");
                 pb.redirectErrorStream(true);
                 Process process = pb.start();
@@ -509,6 +513,9 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications, DashboardT
                         // Example: "01-15 10:30:45.123  1234  1234 E OpModeManager: Error message"
                         ReceiveLogcatErrors.LogcatError entry = parseLogcatLine(line);
                         if (entry != null) {
+                            if (opModeManagerOnly) {
+                                userCodeCrash.accept(entry);
+                            }
                             entryBuffer.add(entry);
                         }
                     } catch (Exception e) {
@@ -607,7 +614,9 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications, DashboardT
                     return null;
                 }
 
-                if (opModeManagerOnly && !OPMODE_MANAGER_TAG.equals(tag)) {
+                if (opModeManagerOnly
+                        && !OPMODE_MANAGER_TAG.equals(tag)
+                        && !OPEN_CV_CAMERA_TAG.equals(tag)) {
                     return null;
                 }
 
@@ -1810,6 +1819,11 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications, DashboardT
                             }
                         }
 
+                        String errorMessage = RobotLog.getGlobalErrorMsg();
+                        if (errorMessage.isEmpty()) {
+                            errorMessage = userCodeCrash.getMessage();
+                        }
+
                         return new RobotStatus(
                                 core.enabled,
                                 true,
@@ -1817,7 +1831,7 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications, DashboardT
                                 // status is an enum so it's okay to return a copy here.
                                 o.status,
                                 RobotLog.getGlobalWarningMessage().message,
-                                RobotLog.getGlobalErrorMsg(),
+                                errorMessage,
                                 batteryVoltage);
                     });
         }
@@ -1930,6 +1944,7 @@ public class FtcDashboard implements OpModeManagerImpl.Notifications, DashboardT
                 });
 
         if (!(opMode instanceof OpModeManagerImpl.DefaultOpMode)) {
+            userCodeCrash.reset(System.currentTimeMillis());
             clearTelemetry();
         }
     }
